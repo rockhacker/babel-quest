@@ -18,10 +18,15 @@ export default defineConfig(({ mode }) => ({
         target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1',
         changeOrigin: true,
         rewrite: (path) => {
-          if (path.startsWith('/api/login') || path.startsWith('/api/logout') || path.startsWith('/api/me')) {
-            return path.replace('/api', '/auth');
+          console.log('Rewriting path:', path);
+          if (path === '/api/login' || path === '/api/logout' || path === '/api/me') {
+            const newPath = path.replace('/api', '/auth');
+            console.log('Auth path rewritten to:', newPath);
+            return newPath;
           }
-          return path.replace('/api', '/api');
+          const newPath = path.replace('/api', '/api');
+          console.log('API path rewritten to:', newPath);
+          return newPath;
         }
       }
     }
