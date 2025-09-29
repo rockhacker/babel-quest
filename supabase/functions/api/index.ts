@@ -185,7 +185,8 @@ Deno.serve(async (req) => {
           const cursor = url.searchParams.get('cursor');
           const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
 
-          const baseUrl = url.origin;
+          // 从请求头获取前端域名
+          const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/[^\/]*$/, '') || 'https://727de735-cc70-42ed-a3f9-80607a44faa1.lovableproject.com';
 
           let query = supabase.from('replicas').select(`
             *,
@@ -193,8 +194,8 @@ Deno.serve(async (req) => {
             types (name)
           `);
 
-          if (brandId) query = query.eq('brand_id', brandId);
-          if (typeId) query = query.eq('type_id', typeId);
+          if (brandId && brandId !== 'all') query = query.eq('brand_id', brandId);
+          if (typeId && typeId !== 'all') query = query.eq('type_id', typeId);
           if (batchId) query = query.eq('batch_id', batchId);
           if (scanned === '0') query = query.eq('scanned', false);
           if (scanned === '1') query = query.eq('scanned', true);
@@ -209,7 +210,7 @@ Deno.serve(async (req) => {
           const items = data.map(item => ({
             ...item,
             rid: item.id,
-            url: `${baseUrl}/r/${item.token}`
+            url: `${origin}/r/${item.token}`
           }));
 
           const nextCursor = items.length === limit ? items[items.length - 1].id : null;

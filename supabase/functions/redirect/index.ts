@@ -24,19 +24,23 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('Redirect request for token:', token);
     // 查找副本记录
     const { data: replica, error: replicaError } = await supabase
       .from('replicas')
       .select('*')
       .eq('token', token)
-      .single();
+      .maybeSingle();
 
     if (replicaError || !replica) {
+      console.log('Replica not found for token:', token, 'Error:', replicaError);
       return new Response('Not Found', { 
         status: 404,
         headers: { 'Content-Type': 'text/plain' }
       });
     }
+
+    console.log('Found replica:', replica.id, 'bound_original_id:', replica.bound_original_id);
 
     // 检查是否已绑定原始码
     if (replica.bound_original_id) {
@@ -45,7 +49,7 @@ Deno.serve(async (req) => {
         .from('originals')
         .select('url')
         .eq('id', replica.bound_original_id)
-        .single();
+        .maybeSingle();
 
       if (originalError || !original) {
         return new Response('Original missing', { 
