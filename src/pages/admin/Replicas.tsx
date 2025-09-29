@@ -65,9 +65,9 @@ const Replicas: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   
   // 筛选状态
-  const [selectedBrandId, setSelectedBrandId] = useState('');
-  const [selectedTypeId, setSelectedTypeId] = useState('');
-  const [scannedFilter, setScannedFilter] = useState('');
+  const [selectedBrandId, setSelectedBrandId] = useState('all');
+  const [selectedTypeId, setSelectedTypeId] = useState('all');
+  const [scannedFilter, setScannedFilter] = useState('all');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
   // 生成表单
@@ -134,9 +134,9 @@ const Replicas: React.FC = () => {
   const fetchReplicas = async (reset = false) => {
     try {
       const params = new URLSearchParams();
-      if (selectedBrandId) params.append('brandId', selectedBrandId);
-      if (selectedTypeId) params.append('typeId', selectedTypeId);
-      if (scannedFilter) params.append('scanned', scannedFilter);
+      if (selectedBrandId && selectedBrandId !== 'all') params.append('brandId', selectedBrandId);
+      if (selectedTypeId && selectedTypeId !== 'all') params.append('typeId', selectedTypeId);
+      if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
       if (!reset && nextCursor) params.append('cursor', nextCursor);
       
       const response = await fetch(`/api/replicas?${params}`);
@@ -370,7 +370,7 @@ const Replicas: React.FC = () => {
   };
 
   const getFilteredTypes = () => {
-    if (!selectedBrandId) return types;
+    if (!selectedBrandId || selectedBrandId === 'all') return types;
     return types.filter(type => type.brand_id === selectedBrandId);
   };
 
@@ -562,7 +562,7 @@ const Replicas: React.FC = () => {
                     <SelectValue placeholder="全部品牌" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部品牌</SelectItem>
+                    <SelectItem value="all">全部品牌</SelectItem>
                     {brands.map((brand) => (
                       <SelectItem key={brand.id} value={brand.id}>
                         {brand.name}
@@ -579,7 +579,7 @@ const Replicas: React.FC = () => {
                     <SelectValue placeholder="全部类型" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部类型</SelectItem>
+                    <SelectItem value="all">全部类型</SelectItem>
                     {getFilteredTypes().map((type) => (
                       <SelectItem key={type.id} value={type.id}>
                         {type.name}
@@ -596,7 +596,7 @@ const Replicas: React.FC = () => {
                     <SelectValue placeholder="全部状态" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部状态</SelectItem>
+                    <SelectItem value="all">全部状态</SelectItem>
                     <SelectItem value="0">未扫描</SelectItem>
                     <SelectItem value="1">已扫描</SelectItem>
                   </SelectContent>

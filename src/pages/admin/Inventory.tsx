@@ -50,9 +50,9 @@ const Inventory: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   
   // 筛选状态
-  const [selectedBrandId, setSelectedBrandId] = useState('');
-  const [selectedTypeId, setSelectedTypeId] = useState('');
-  const [scannedFilter, setScannedFilter] = useState('');
+  const [selectedBrandId, setSelectedBrandId] = useState('all');
+  const [selectedTypeId, setSelectedTypeId] = useState('all');
+  const [scannedFilter, setScannedFilter] = useState('all');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
   // 表单状态
@@ -102,9 +102,9 @@ const Inventory: React.FC = () => {
   const fetchOriginals = async (reset = false) => {
     try {
       const params = new URLSearchParams();
-      if (selectedBrandId) params.append('brandId', selectedBrandId);
-      if (selectedTypeId) params.append('typeId', selectedTypeId);
-      if (scannedFilter) params.append('scanned', scannedFilter);
+      if (selectedBrandId && selectedBrandId !== 'all') params.append('brandId', selectedBrandId);
+      if (selectedTypeId && selectedTypeId !== 'all') params.append('typeId', selectedTypeId);
+      if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
       if (!reset && nextCursor) params.append('cursor', nextCursor);
       
       const response = await fetch(`/api/originals?${params}`);
@@ -314,7 +314,7 @@ const Inventory: React.FC = () => {
   };
 
   const getFilteredTypes = () => {
-    if (!selectedBrandId) return types;
+    if (!selectedBrandId || selectedBrandId === 'all') return types;
     return types.filter(type => type.brand_id === selectedBrandId);
   };
 
@@ -455,7 +455,7 @@ const Inventory: React.FC = () => {
                     <SelectValue placeholder="全部品牌" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部品牌</SelectItem>
+                    <SelectItem value="all">全部品牌</SelectItem>
                     {brands.map((brand) => (
                       <SelectItem key={brand.id} value={brand.id}>
                         {brand.name}
@@ -472,7 +472,7 @@ const Inventory: React.FC = () => {
                     <SelectValue placeholder="全部类型" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部类型</SelectItem>
+                    <SelectItem value="all">全部类型</SelectItem>
                     {getFilteredTypes().map((type) => (
                       <SelectItem key={type.id} value={type.id}>
                         {type.name}
@@ -489,7 +489,7 @@ const Inventory: React.FC = () => {
                     <SelectValue placeholder="全部状态" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部状态</SelectItem>
+                    <SelectItem value="all">全部状态</SelectItem>
                     <SelectItem value="0">未绑定</SelectItem>
                     <SelectItem value="1">已绑定</SelectItem>
                   </SelectContent>
