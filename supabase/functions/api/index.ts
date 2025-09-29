@@ -229,9 +229,9 @@ Deno.serve(async (req) => {
         if (endpoint === 'bulk-delete' && pathParts.includes('originals')) {
           const { brandId, typeId } = await req.json();
           
-          if (!brandId || !typeId) {
+          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
             return new Response(
-              JSON.stringify({ ok: false, msg: '品牌ID和类型ID不能为空' }),
+              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
@@ -251,9 +251,9 @@ Deno.serve(async (req) => {
         if (endpoint === 'bulk-delete' && pathParts.includes('replicas')) {
           const { brandId, typeId } = await req.json();
           
-          if (!brandId || !typeId) {
+          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
             return new Response(
-              JSON.stringify({ ok: false, msg: '品牌ID和类型ID不能为空' }),
+              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
@@ -449,6 +449,45 @@ Deno.serve(async (req) => {
 
           return new Response(
             JSON.stringify({ ok: true, batchId: batch.id }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'bulk-delete' && pathParts.includes('replicas')) {
+          const { brandId, typeId, deleteOriginals } = await req.json();
+          
+          // 构建查询条件
+          let replicaQuery = supabase.from('replicas').delete();
+          let originalQuery = deleteOriginals 
+            ? supabase.from('originals').delete()
+            : supabase.from('originals').update({ replica_id: null, scanned: false, scanned_at: null });
+
+          // 添加筛选条件
+          if (brandId && brandId !== 'all') {
+            replicaQuery = replicaQuery.eq('brand_id', brandId);
+            originalQuery = originalQuery.eq('brand_id', brandId);
+          }
+          if (typeId && typeId !== 'all') {
+            replicaQuery = replicaQuery.eq('type_id', typeId);
+            originalQuery = originalQuery.eq('type_id', typeId);
+          }
+
+          // 执行删除操作
+          if (!deleteOriginals) {
+            // 先更新原始码状态
+            await originalQuery;
+          }
+
+          // 删除副本
+          const { count } = await replicaQuery;
+
+          // 如果需要删除原始码，在删除副本后执行
+          if (deleteOriginals) {
+            await originalQuery;
+          }
+
+          return new Response(
+            JSON.stringify({ ok: true, deleted: count || 0 }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
