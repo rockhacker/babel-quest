@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { 
   QrCode, 
@@ -48,6 +49,8 @@ const Inventory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   
   // 筛选状态
   const [selectedBrandId, setSelectedBrandId] = useState('all');
@@ -226,6 +229,7 @@ const Inventory: React.FC = () => {
 
   const startScanning = async () => {
     setScanning(true);
+    setShowCameraModal(true);
     try {
       // 检查浏览器是否支持 BarcodeDetector
       if ('BarcodeDetector' in window) {
@@ -241,8 +245,18 @@ const Inventory: React.FC = () => {
         description: "无法启动摄像头或扫码功能",
         variant: "destructive",
       });
+      setShowCameraModal(false);
     } finally {
       setScanning(false);
+    }
+  };
+
+  const stopScanning = () => {
+    setScanning(false);
+    setShowCameraModal(false);
+    if (videoStream) {
+      videoStream.getTracks().forEach(track => track.stop());
+      setVideoStream(null);
     }
   };
 
@@ -251,9 +265,14 @@ const Inventory: React.FC = () => {
       video: { facingMode: 'environment' } 
     });
     
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    video.play();
+    setVideoStream(stream);
+    
+    // 获取视频元素并设置流
+    const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
+    if (videoElement) {
+      videoElement.srcObject = stream;
+      videoElement.play();
+    }
 
     const barcodeDetector = new (window as any).BarcodeDetector({
       formats: ['qr_code']
@@ -261,37 +280,43 @@ const Inventory: React.FC = () => {
 
     const detectLoop = async () => {
       try {
-        const barcodes = await barcodeDetector.detect(video);
-        if (barcodes.length > 0) {
-          const qrContent = barcodes[0].rawValue;
-          setQrUrl(qrContent);
-          
-          // 自动提交
-          if (formBrandId && formTypeId) {
-            const response = await fetch('/api/originals', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                brandId: formBrandId, 
-                typeId: formTypeId, 
-                url: qrContent 
-              }),
-            });
+        if (videoElement) {
+          const barcodes = await barcodeDetector.detect(videoElement);
+          if (barcodes.length > 0) {
+            const qrContent = barcodes[0].rawValue;
+            setQrUrl(qrContent);
             
-            const data = await response.json();
-            toast({
-              title: data.ok ? "扫码入库成功" : "扫码入库失败",
-              description: data.msg || (data.ok ? "已自动入库" : "入库失败"),
-              variant: data.ok ? "default" : "destructive",
-            });
-            
-            if (data.ok) {
-              fetchOriginals(true);
+            // 自动提交
+            if (formBrandId && formTypeId) {
+              const response = await fetch('/api/originals', {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  credentials: 'include'
+                },
+                credentials: 'include',
+                body: JSON.stringify({ 
+                  brandId: formBrandId, 
+                  typeId: formTypeId, 
+                  url: qrContent 
+                }),
+              });
+              
+              const data = await response.json();
+              toast({
+                title: data.ok ? "扫码入库成功" : "扫码入库失败",
+                description: data.msg || (data.ok ? "已自动入库" : "入库失败"),
+                variant: data.ok ? "default" : "destructive",
+              });
+              
+              if (data.ok) {
+                fetchOriginals(true);
+              }
             }
+            
+            stopScanning();
+            return;
           }
-          
-          stream.getTracks().forEach(track => track.stop());
-          return;
         }
         
         if (scanning) {
@@ -306,10 +331,22 @@ const Inventory: React.FC = () => {
   };
 
   const scanWithCamera = async () => {
-    // 简化版：启动摄像头预览，用户手动输入
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode: 'environment' } 
+    });
+    
+    setVideoStream(stream);
+    
+    // 获取视频元素并设置流
+    const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
+    if (videoElement) {
+      videoElement.srcObject = stream;
+      videoElement.play();
+    }
+
     toast({
-      title: "扫码模式",
-      description: "请手动输入扫描到的二维码内容",
+      title: "摄像头已启动",
+      description: "请对准二维码进行扫描，或手动输入二维码内容",
     });
   };
 
@@ -588,6 +625,74 @@ const Inventory: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* 摄像头扫描模态框 */}
+      <Dialog open={showCameraModal} onOpenChange={(open) => {
+        if (!open) {
+          stopScanning();
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Camera className="h-5 w-5" />
+              <span>摄像头扫描</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* 摄像头视频画面 */}
+            <div className="relative bg-black rounded-lg overflow-hidden">
+              <video
+                id="camera-video"
+                className="w-full h-64 object-cover"
+                autoPlay
+                playsInline
+                muted
+              />
+              
+              {/* 扫描框覆盖层 */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-48 h-48 border-2 border-white/50 rounded-lg relative">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg"></div>
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg"></div>
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg"></div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg"></div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-center text-sm text-muted-foreground">
+              <p>将二维码对准扫描框进行扫描</p>
+              <p>确保二维码清晰可见，支持自动识别</p>
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={stopScanning}
+                className="flex-1"
+              >
+                取消扫描
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => {
+                  // 手动输入模式
+                  stopScanning();
+                  toast({
+                    title: "切换到手动输入",
+                    description: "请在下方输入框中输入二维码内容",
+                  });
+                }}
+                className="flex-1"
+              >
+                手动输入
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
