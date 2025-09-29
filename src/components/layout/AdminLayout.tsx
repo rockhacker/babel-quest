@@ -41,6 +41,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   if (!user) {
+    navigate('/login');
     return null;
   }
 
