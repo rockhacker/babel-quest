@@ -320,7 +320,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      bind_replica_to_original: {
+        Args: { p_brand_id: string; p_replica_id: string; p_type_id: string }
+        Returns: {
+          original_url: string
+        }[]
+      }
     }
     Enums: {
       export_status: "pending" | "processing" | "finished" | "failed"
