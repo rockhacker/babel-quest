@@ -8,6 +8,8 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/admin/Dashboard";
 import Catalog from "@/pages/admin/Catalog";
+import Inventory from "@/pages/admin/Inventory";
+import Replicas from "@/pages/admin/Replicas";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,12 +36,12 @@ const App = () => (
             } />
             <Route path="/admin/inventory" element={
               <AdminLayout>
-                <div>库存管理页面开发中...</div>
+                <Inventory />
               </AdminLayout>
             } />
             <Route path="/admin/replicas" element={
               <AdminLayout>
-                <div>副本管理页面开发中...</div>
+                <Replicas />
               </AdminLayout>
             } />
             <Route path="*" element={<NotFound />} />

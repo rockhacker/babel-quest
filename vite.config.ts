@@ -9,6 +9,11 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
+      '/r': {
+        target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/r', '')
+      },
       '/api': {
         target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1',
         changeOrigin: true,
