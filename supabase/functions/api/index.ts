@@ -236,14 +236,22 @@ Deno.serve(async (req) => {
             );
           }
 
-          const { count } = await supabase
+          // 先查询要删除的原始码数量
+          const { count: deleteCount } = await supabase
+            .from('originals')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          // 执行删除
+          await supabase
             .from('originals')
             .delete()
             .eq('brand_id', brandId)
             .eq('type_id', typeId);
 
           return new Response(
-            JSON.stringify({ ok: true, deleted: count || 0 }),
+            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -258,22 +266,29 @@ Deno.serve(async (req) => {
             );
           }
 
+          // 先查询要删除的副本数量
+          const { count: deleteCount } = await supabase
+            .from('replicas')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
           // 首先清空 originals 中的 replica_id
           await supabase
             .from('originals')
-            .update({ replica_id: null })
+            .update({ replica_id: null, scanned: false, scanned_at: null })
             .eq('brand_id', brandId)
             .eq('type_id', typeId);
 
           // 然后删除副本
-          const { count } = await supabase
+          await supabase
             .from('replicas')
             .delete()
             .eq('brand_id', brandId)
             .eq('type_id', typeId);
 
           return new Response(
-            JSON.stringify({ ok: true, deleted: count || 0 }),
+            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -478,8 +493,21 @@ Deno.serve(async (req) => {
             await originalQuery;
           }
 
-          // 删除副本
-          const { count } = await replicaQuery;
+          // 删除副本 - 先查询要删除的记录数
+          let countQuery = supabase.from('replicas').select('*', { count: 'exact', head: true });
+          
+          // 添加相同的筛选条件
+          if (brandId && brandId !== 'all') {
+            countQuery = countQuery.eq('brand_id', brandId);
+          }
+          if (typeId && typeId !== 'all') {
+            countQuery = countQuery.eq('type_id', typeId);
+          }
+
+          const { count: deleteCount } = await countQuery;
+
+          // 执行删除
+          await replicaQuery;
 
           // 如果需要删除原始码，在删除副本后执行
           if (deleteOriginals) {
@@ -487,7 +515,7 @@ Deno.serve(async (req) => {
           }
 
           return new Response(
-            JSON.stringify({ ok: true, deleted: count || 0 }),
+            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
