@@ -8,6 +8,18 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/api': {
+        target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1',
+        changeOrigin: true,
+        rewrite: (path) => {
+          if (path.startsWith('/api/login') || path.startsWith('/api/logout') || path.startsWith('/api/me')) {
+            return path.replace('/api', '/auth');
+          }
+          return path.replace('/api', '/api');
+        }
+      }
+    }
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
