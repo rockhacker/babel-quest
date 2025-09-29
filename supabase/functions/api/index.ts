@@ -220,48 +220,6 @@ Deno.serve(async (req) => {
           );
         }
 
-        if (endpoint === 'originals') {
-          const { brandId, typeId, url } = await req.json();
-          
-          if (!brandId || !typeId || !url) {
-            return new Response(
-              JSON.stringify({ ok: false, msg: '品牌ID、类型ID和URL不能为空' }),
-              { 
-                status: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            );
-          }
-
-          // 检查是否已存在相同URL
-          const { data: existing } = await supabase
-            .from('originals')
-            .select('id')
-            .eq('url', url)
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId)
-            .single();
-
-          if (existing) {
-            return new Response(
-              JSON.stringify({ ok: true, msg: '已存在，略过' }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          const { data, error } = await supabase
-            .from('originals')
-            .insert({ brand_id: brandId, type_id: typeId, url })
-            .select()
-            .single();
-
-          if (error) throw error;
-
-          return new Response(
-            JSON.stringify({ ok: true, id: data.id }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
 
         if (endpoint === 'generate' && pathParts.includes('replicas')) {
           const { brandId, typeId, count } = await req.json();
@@ -446,6 +404,49 @@ Deno.serve(async (req) => {
 
           return new Response(
             JSON.stringify({ ok: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'originals') {
+          const { brandId, typeId, url } = await req.json();
+          
+          if (!brandId || !typeId || !url) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '品牌ID、类型ID和URL不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 检查是否已存在相同URL
+          const { data: existing } = await supabase
+            .from('originals')
+            .select('id')
+            .eq('url', url)
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId)
+            .single();
+
+          if (existing) {
+            return new Response(
+              JSON.stringify({ ok: true, msg: '已存在，略过' }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const { data, error } = await supabase
+            .from('originals')
+            .insert({ brand_id: brandId, type_id: typeId, url })
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          return new Response(
+            JSON.stringify({ ok: true, id: data.id }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }

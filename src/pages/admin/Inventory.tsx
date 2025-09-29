@@ -272,6 +272,19 @@ const Inventory: React.FC = () => {
     if (videoElement) {
       videoElement.srcObject = stream;
       videoElement.play();
+      
+      // 等待视频准备就绪
+      await new Promise((resolve) => {
+        const onCanPlay = () => {
+          videoElement.removeEventListener('canplay', onCanPlay);
+          resolve(void 0);
+        };
+        if (videoElement.readyState >= 3) {
+          resolve(void 0);
+        } else {
+          videoElement.addEventListener('canplay', onCanPlay);
+        }
+      });
     }
 
     const barcodeDetector = new (window as any).BarcodeDetector({
@@ -280,7 +293,7 @@ const Inventory: React.FC = () => {
 
     const detectLoop = async () => {
       try {
-        if (videoElement) {
+        if (videoElement && videoElement.readyState >= 2) { // 确保视频已加载
           const barcodes = await barcodeDetector.detect(videoElement);
           if (barcodes.length > 0) {
             const qrContent = barcodes[0].rawValue;
