@@ -31,7 +31,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/me');
+      const response = await fetch('/api/me', {
+        credentials: 'include'
+      });
       if (response.ok) {
         const data = await response.json();
         if (data.ok) {
@@ -52,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
 
@@ -70,7 +73,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await fetch('/api/logout', { method: 'POST' });
+      await fetch('/api/logout', { 
+        method: 'POST',
+        credentials: 'include'
+      });
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {

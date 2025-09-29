@@ -38,8 +38,8 @@ const Catalog: React.FC = () => {
   const fetchData = async () => {
     try {
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands'),
-        fetch('/api/types'),
+        fetch('/api/brands', { credentials: 'include' }),
+        fetch('/api/types', { credentials: 'include' }),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {
@@ -77,6 +77,7 @@ const Catalog: React.FC = () => {
       const response = await fetch('/api/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name: brandName.trim() }),
       });
 
@@ -124,6 +125,7 @@ const Catalog: React.FC = () => {
       const response = await fetch('/api/types', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           name: typeName.trim() 
