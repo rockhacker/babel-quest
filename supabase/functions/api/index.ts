@@ -221,64 +221,6 @@ Deno.serve(async (req) => {
         }
 
 
-        if (endpoint === 'generate' && pathParts.includes('replicas')) {
-          const { brandId, typeId, count } = await req.json();
-          
-          if (!brandId || !typeId || !count) {
-            return new Response(
-              JSON.stringify({ ok: false, msg: '品牌ID、类型ID和数量不能为空' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          const replicaCount = Math.min(Math.max(parseInt(count), 1), 1000);
-
-          // 检查原始码库存
-          const { count: originalCount } = await supabase
-            .from('originals')
-            .select('*', { count: 'exact', head: true })
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId)
-            .eq('scanned', false);
-
-          if (!originalCount || originalCount === 0) {
-            return new Response(
-              JSON.stringify({ ok: false, msg: '该品牌-类型暂无原始码库存，未生成副本' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          // 创建批次
-          const { data: batch, error: batchError } = await supabase
-            .from('batches')
-            .insert({ brand_id: brandId, type_id: typeId, count: replicaCount })
-            .select()
-            .single();
-
-          if (batchError) throw batchError;
-
-          // 生成副本码
-          const replicas = [];
-          for (let i = 0; i < replicaCount; i++) {
-            replicas.push({
-              brand_id: brandId,
-              type_id: typeId,
-              token: crypto.randomUUID().replace(/-/g, '').substring(0, 16),
-              batch_id: batch.id
-            });
-          }
-
-          const { error: replicasError } = await supabase
-            .from('replicas')
-            .insert(replicas);
-
-          if (replicasError) throw replicasError;
-
-          return new Response(
-            JSON.stringify({ ok: true, batchId: batch.id }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
 
         break;
 
@@ -447,6 +389,65 @@ Deno.serve(async (req) => {
 
           return new Response(
             JSON.stringify({ ok: true, id: data.id }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'generate' && pathParts.includes('replicas')) {
+          const { brandId, typeId, count } = await req.json();
+          
+          if (!brandId || !typeId || !count) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '品牌ID、类型ID和数量不能为空' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const replicaCount = Math.min(Math.max(parseInt(count), 1), 1000);
+
+          // 检查原始码库存
+          const { count: originalCount } = await supabase
+            .from('originals')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId)
+            .eq('scanned', false);
+
+          if (!originalCount || originalCount === 0) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '该品牌-类型暂无原始码库存，未生成副本' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // 创建批次
+          const { data: batch, error: batchError } = await supabase
+            .from('batches')
+            .insert({ brand_id: brandId, type_id: typeId, count: replicaCount })
+            .select()
+            .single();
+
+          if (batchError) throw batchError;
+
+          // 生成副本码
+          const replicas = [];
+          for (let i = 0; i < replicaCount; i++) {
+            replicas.push({
+              brand_id: brandId,
+              type_id: typeId,
+              token: crypto.randomUUID().replace(/-/g, '').substring(0, 16),
+              batch_id: batch.id
+            });
+          }
+
+          const { error: replicasError } = await supabase
+            .from('replicas')
+            .insert(replicas);
+
+          if (replicasError) throw replicasError;
+
+          return new Response(
+            JSON.stringify({ ok: true, batchId: batch.id }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
