@@ -51,9 +51,10 @@ export default defineConfig(({ mode }) => ({
             console.log('Auth path rewritten to:', newPath);
             return newPath;
           }
-          // 对于其他API路径，保持原始路径
-          console.log('General API path kept as:', path);
-          return path;
+          // 对于其他API路径，重写为正确的api路径
+          const newPath = path.replace('/api', '/api');
+          console.log('General API path rewritten to:', newPath);
+          return newPath;
         }
       }
     }
