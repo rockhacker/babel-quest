@@ -17,7 +17,11 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(p => p);
-  const token = pathParts[pathParts.length - 1]; // 获取最后一部分作为token
+  console.log('Redirect URL:', req.url, 'Path parts:', pathParts);
+  
+  // Extract token from path like /r/token or /admin/r/token
+  const rIndex = pathParts.findIndex(part => part === 'r');
+  const token = rIndex >= 0 && rIndex < pathParts.length - 1 ? pathParts[rIndex + 1] : pathParts[pathParts.length - 1];
 
   if (req.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 });
@@ -58,8 +62,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      // 确保URL格式正确
+      let redirectUrl = original.url;
+      if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
+        redirectUrl = 'https://' + redirectUrl;
+      }
+      
+      console.log('Redirecting to:', redirectUrl);
       // 执行302跳转，支持最多3次跟随
-      return await followRedirects(original.url, 3);
+      return await followRedirects(redirectUrl, 3);
     }
 
     // 未绑定，开始事务绑定流程
@@ -78,15 +89,22 @@ Deno.serve(async (req) => {
     }
 
     const bindingData = result.data;
-    if (!bindingData || !bindingData.original_url) {
+    if (!bindingData || bindingData.length === 0 || !bindingData[0]?.original_url) {
       return new Response('No available original QR for this brand/type', { 
         status: 404,
         headers: { 'Content-Type': 'text/plain' }
       });
     }
 
+    // 确保URL格式正确
+    let redirectUrl = bindingData[0].original_url;
+    if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
+      redirectUrl = 'https://' + redirectUrl;
+    }
+    
+    console.log('First time binding, redirecting to:', redirectUrl);
     // 执行302跳转
-    return await followRedirects(bindingData.original_url, 3);
+    return await followRedirects(redirectUrl, 3);
 
   } catch (error) {
     console.error('Redirect error:', error);
