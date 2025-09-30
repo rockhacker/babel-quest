@@ -8,28 +8,31 @@
 function getApiBaseUrl(): string {
   const hostname = window.location.hostname;
   
-  // 检查是否在开发环境或预览环境
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || 
-      hostname.includes('lovableproject.com') || hostname.includes('lovable.app') ||
-      hostname.includes('preview--')) {
-    return '/api';
-  }
+  // 如果hostname包含这些关键词，说明是开发/预览环境
+  const isLocalOrPreview = hostname === 'localhost' || 
+                          hostname === '127.0.0.1' || 
+                          hostname.includes('lovable') ||
+                          hostname.includes('preview') ||
+                          hostname.includes('dev') ||
+                          hostname.includes('test');
   
-  // 生产环境使用完整URL
-  return 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
+  return isLocalOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
 }
 
 // 获取请求配置
 function getRequestConfig(): RequestInit {
   const hostname = window.location.hostname;
   
-  // 开发环境和预览环境使用include，生产环境使用omit
-  const isDevOrPreview = hostname === 'localhost' || hostname === '127.0.0.1' || 
-                        hostname.includes('lovableproject.com') || hostname.includes('lovable.app') ||
-                        hostname.includes('preview--');
+  // 如果hostname包含这些关键词，说明是开发/预览环境
+  const isLocalOrPreview = hostname === 'localhost' || 
+                          hostname === '127.0.0.1' || 
+                          hostname.includes('lovable') ||
+                          hostname.includes('preview') ||
+                          hostname.includes('dev') ||
+                          hostname.includes('test');
   
   return {
-    credentials: isDevOrPreview ? 'include' as RequestCredentials : 'omit'
+    credentials: isLocalOrPreview ? 'include' as RequestCredentials : 'omit'
   };
 }
 
