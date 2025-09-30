@@ -32,7 +32,9 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) => {
           console.log('Rewriting path:', path);
           if (path === '/api/login' || path === '/api/logout' || path === '/api/me') {
-            const newPath = path.replace('/api', '/auth');
+            // 提取端点名称，如 login, logout, me
+            const endpoint = path.split('/').pop();
+            const newPath = `/auth/${endpoint}`;
             console.log('Auth path rewritten to:', newPath);
             return newPath;
           }
