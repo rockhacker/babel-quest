@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重定向测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+        .info { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .button { background: #007AFF; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>重定向功能测试</h1>
+    
+    <div class="info">
+        <h3>当前环境信息：</h3>
+        <p><strong>当前URL:</strong> <span id="currentUrl"></span></p>
+        <p><strong>User Agent:</strong> <span id="userAgent"></span></p>
+        <p><strong>设备类型:</strong> <span id="deviceType"></span></p>
+    </div>
+    
+    <h3>测试链接：</h3>
+    <button class="button" onclick="testDirect()">直接访问Edge Function</button>
+    <button class="button" onclick="testAdmin()">测试 /admin/r/ 路径</button>
+    <button class="button" onclick="testR()">测试 /r/ 路径</button>
+    
+    <div class="info">
+        <h3>测试结果：</h3>
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+        
+        const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|Windows Phone|webOS/i.test(navigator.userAgent);
+        document.getElementById('deviceType').textContent = isMobile ? '移动设备' : '桌面设备';
+        
+        function addResult(text) {
+            const results = document.getElementById('results');
+            results.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + text + '</p>';
+        }
+        
+        function testDirect() {
+            addResult('测试直接访问Edge Function...');
+            window.open('https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/89b6e8c26ca848d8', '_blank');
+        }
+        
+        function testAdmin() {
+            addResult('测试 /admin/r/ 路径...');
+            window.location.href = '/admin/r/89b6e8c26ca848d8';
+        }
+        
+        function testR() {
+            addResult('测试 /r/ 路径...');
+            window.location.href = '/r/89b6e8c26ca848d8';
+        }
+    </script>
+</body>
+</html>
