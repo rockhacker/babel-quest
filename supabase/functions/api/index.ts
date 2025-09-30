@@ -221,6 +221,41 @@ Deno.serve(async (req) => {
           );
         }
 
+        // 查询导出任务状态
+        if (pathParts.includes('replica_export_jobs') && pathParts.length > 2) {
+          const jobId = pathParts[pathParts.length - 1];
+          
+          const { data: job, error: jobError } = await supabase
+            .from('export_jobs')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+
+          if (jobError || !job) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '任务未找到' }),
+              { 
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          const progress = job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;
+
+          return new Response(
+            JSON.stringify({ 
+              ok: true,
+              status: job.status,
+              total: job.total,
+              completed: job.completed,
+              progress: progress,
+              file_path: job.file_path,
+              error_message: job.error_message
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
 
         break;
@@ -516,6 +551,49 @@ Deno.serve(async (req) => {
 
           return new Response(
             JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'replica_export_jobs') {
+          const { brandId, typeId, baseUrl } = await req.json();
+          
+          if (!brandId || !typeId) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '品牌ID和类型ID不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 创建导出任务，如果是'all'则传null
+          const insertData: any = {
+            base_url: baseUrl,
+            status: 'pending'
+          };
+          
+          if (brandId !== 'all') insertData.brand_id = brandId;
+          if (typeId !== 'all') insertData.type_id = typeId;
+
+          const { data: exportJob, error: jobError } = await supabase
+            .from('export_jobs')
+            .insert(insertData)
+            .select()
+            .single();
+
+          if (jobError) {
+            console.error('Export job creation error:', jobError);
+            throw jobError;
+          }
+
+          return new Response(
+            JSON.stringify({ 
+              ok: true, 
+              jobId: exportJob.id,
+              status: exportJob.status 
+            }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
