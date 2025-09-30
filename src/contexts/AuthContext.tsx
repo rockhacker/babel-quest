@@ -32,12 +32,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     try {
-      console.log('Checking auth...');
       const response = await apiRequest('/me');
-      console.log('Auth check response:', response.status, response.ok);
       if (response.ok) {
         const data = await response.json();
-        console.log('Auth check data:', data);
         if (data.ok) {
           setUser(data.user);
         }
