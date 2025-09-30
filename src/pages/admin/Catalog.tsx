@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Package, Plus, Tags, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/api';
 
 interface Brand {
   id: string;
@@ -39,20 +38,15 @@ const Catalog: React.FC = () => {
   const fetchData = async () => {
     try {
       const [brandsRes, typesRes] = await Promise.all([
-        apiRequest('/brands'),
-        apiRequest('/types'),
+        fetch('/api/brands', { credentials: 'include' }),
+        fetch('/api/types', { credentials: 'include' }),
       ]);
-
-      console.log('Fetch responses:', { brands: brandsRes.status, types: typesRes.status });
 
       if (brandsRes.ok && typesRes.ok) {
         const brandsData = await brandsRes.json();
         const typesData = await typesRes.json();
         setBrands(brandsData);
         setTypes(typesData);
-      } else {
-        console.error('Fetch failed:', { brands: brandsRes.status, types: typesRes.status });
-        throw new Error('Failed to fetch data');
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -80,8 +74,10 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await apiRequest('/brands', {
+      const response = await fetch('/api/brands', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name: brandName.trim() }),
       });
 
@@ -126,16 +122,10 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // 根据环境决定API端点
-      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
-      const apiUrl = isProduction
-        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types'
-        : '/api/types';
-        
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/types', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: isProduction ? 'omit' : 'include',
+        credentials: 'include',
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           name: typeName.trim() 
@@ -177,15 +167,9 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // 根据环境决定API端点
-      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
-      const apiUrl = isProduction
-        ? `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands/${brandId}`
-        : `/api/brands/${brandId}`;
-        
-      const response = await fetch(apiUrl, {
+      const response = await fetch(`/api/brands/${brandId}`, {
         method: 'DELETE',
-        credentials: isProduction ? 'omit' : 'include',
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -221,15 +205,9 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // 根据环境决定API端点
-      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
-      const apiUrl = isProduction
-        ? `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types/${typeId}`
-        : `/api/types/${typeId}`;
-        
-      const response = await fetch(apiUrl, {
+      const response = await fetch(`/api/types/${typeId}`, {
         method: 'DELETE',
-        credentials: isProduction ? 'omit' : 'include',
+        credentials: 'include',
       });
 
       const data = await response.json();

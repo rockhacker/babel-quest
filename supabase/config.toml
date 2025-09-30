@@ -3,8 +3,8 @@ project_id = "isfxgcfocfctwixklbvw"
 [auth]
 enabled = true
 image = "supabase/gotrue:v2.158.1"
-site_url = "https://babel-quest.lovable.app"
-additional_redirect_urls = ["https://localhost:3000", "https://727de735-cc70-42ed-a3f9-80607a44faa1.lovableproject.com", "https://babel-quest.lovable.app"]
+site_url = "https://727de735-cc70-42ed-a3f9-80607a44faa1.lovableproject.com"
+additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 refresh_token_rotation_enabled = true
 security_update_password_require_reauthentication = true

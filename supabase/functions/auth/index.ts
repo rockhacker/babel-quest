@@ -2,9 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cookie',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 // 获取环境变量中的管理员凭据
@@ -33,19 +31,14 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname.split('/').pop();
 
-  console.log('Auth request received:', req.method, url.pathname, 'from origin:', req.headers.get('origin'));
-  
   try {
     switch (req.method) {
       case 'POST':
         if (path === 'login') {
-          console.log('Login attempt from:', req.headers.get('origin'));
           const { username, password } = await req.json();
           
-          console.log('Validating credentials for user:', username);
           // 验证凭据
           if (username !== ADMIN_USER || password !== ADMIN_PASS) {
-            console.log('Invalid credentials provided');
             return new Response(
               JSON.stringify({ ok: false, msg: '用户名或密码错误' }),
               { 
@@ -55,7 +48,6 @@ Deno.serve(async (req) => {
             );
           }
 
-          console.log('Creating session for user:', username);
           // 生成session ID
           const sessionId = crypto.randomUUID();
           const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24小时后过期
@@ -87,11 +79,11 @@ Deno.serve(async (req) => {
               headers: { 
                 ...corsHeaders, 
                 'Content-Type': 'application/json',
-                'Set-Cookie': `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax; Secure`
+                'Set-Cookie': `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`
               }
             }
           );
-          console.log('Login successful for user:', username);
+
           return response;
         }
 
@@ -145,7 +137,7 @@ Deno.serve(async (req) => {
             .select('*')
             .eq('session_id', sessionId)
             .gt('expires_at', new Date().toISOString())
-            .maybeSingle();
+            .single();
 
           if (error || !session) {
             return new Response(
