@@ -45,17 +45,23 @@
         
         function testDirect() {
             addResult('测试直接访问Edge Function...');
-            window.open('https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/89b6e8c26ca848d8', '_blank');
+            const directUrl = 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/89b6e8c26ca848d8';
+            addResult('直接URL: ' + directUrl);
+            window.open(directUrl, '_blank');
         }
         
         function testAdmin() {
             addResult('测试 /admin/r/ 路径...');
-            window.location.href = '/admin/r/89b6e8c26ca848d8';
+            const adminUrl = window.location.origin + '/admin/r/89b6e8c26ca848d8';
+            addResult('Admin URL: ' + adminUrl);
+            window.location.href = adminUrl;
         }
         
         function testR() {
             addResult('测试 /r/ 路径...');
-            window.location.href = '/r/89b6e8c26ca848d8';
+            const rUrl = window.location.origin + '/r/89b6e8c26ca848d8';
+            addResult('R URL: ' + rUrl);
+            window.location.href = rUrl;
         }
     </script>
 </body>
