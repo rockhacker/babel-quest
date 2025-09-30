@@ -385,72 +385,7 @@ Deno.serve(async (req) => {
         break;
 
       case 'DELETE':
-        if (endpoint === 'bulk-delete' && pathParts.includes('originals')) {
-          const { brandId, typeId } = await req.json();
-          
-          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
-            return new Response(
-              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          // 先查询要删除的原始码数量
-          const { count: deleteCount } = await supabase
-            .from('originals')
-            .select('*', { count: 'exact', head: true })
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId);
-
-          // 执行删除
-          await supabase
-            .from('originals')
-            .delete()
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId);
-
-          return new Response(
-            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        if (endpoint === 'bulk-delete' && pathParts.includes('replicas')) {
-          const { brandId, typeId } = await req.json();
-          
-          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
-            return new Response(
-              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          // 先查询要删除的副本数量
-          const { count: deleteCount } = await supabase
-            .from('replicas')
-            .select('*', { count: 'exact', head: true })
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId);
-
-          // 首先清空 originals 中的 replica_id
-          await supabase
-            .from('originals')
-            .update({ replica_id: null, scanned: false, scanned_at: null })
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId);
-
-          // 然后删除副本
-          await supabase
-            .from('replicas')
-            .delete()
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId);
-
-          return new Response(
-            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        // 删除方法暂时不处理批量删除，所有批量删除都在POST方法中处理
 
       case 'POST':
         if (endpoint === 'brands') {
@@ -627,51 +562,108 @@ Deno.serve(async (req) => {
           );
         }
 
+        // 原始码批量删除
+        if (endpoint === 'bulk-delete' && pathParts.includes('originals')) {
+          const { brandId, typeId } = await req.json();
+          
+          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // 先查询要删除的原始码数量
+          const { count: deleteCount } = await supabase
+            .from('originals')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          // 删除原始码
+          await supabase
+            .from('originals')
+            .delete()
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          return new Response(
+            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 副本批量删除 - 增强版，支持同时删除原始码
         if (endpoint === 'bulk-delete' && pathParts.includes('replicas')) {
           const { brandId, typeId, deleteOriginals } = await req.json();
           
-          // 构建查询条件
-          let replicaQuery = supabase.from('replicas').delete();
-          let originalQuery = deleteOriginals 
-            ? supabase.from('originals').delete()
-            : supabase.from('originals').update({ replica_id: null, scanned: false, scanned_at: null });
-
-          // 添加筛选条件
-          if (brandId && brandId !== 'all') {
-            replicaQuery = replicaQuery.eq('brand_id', brandId);
-            originalQuery = originalQuery.eq('brand_id', brandId);
-          }
-          if (typeId && typeId !== 'all') {
-            replicaQuery = replicaQuery.eq('type_id', typeId);
-            originalQuery = originalQuery.eq('type_id', typeId);
+          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
 
-          // 执行删除操作
-          if (!deleteOriginals) {
-            // 先更新原始码状态
-            await originalQuery;
-          }
+          // 先查询要删除的副本数量
+          const { count: deleteCount } = await supabase
+            .from('replicas')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
 
-          // 删除副本 - 先查询要删除的记录数
-          let countQuery = supabase.from('replicas').select('*', { count: 'exact', head: true });
-          
-          // 添加相同的筛选条件
-          if (brandId && brandId !== 'all') {
-            countQuery = countQuery.eq('brand_id', brandId);
-          }
-          if (typeId && typeId !== 'all') {
-            countQuery = countQuery.eq('type_id', typeId);
-          }
-
-          const { count: deleteCount } = await countQuery;
-
-          // 执行删除
-          await replicaQuery;
-
-          // 如果需要删除原始码，在删除副本后执行
           if (deleteOriginals) {
-            await originalQuery;
+            // 如果需要同时删除原始码，先删除原始码
+            await supabase
+              .from('originals')
+              .delete()
+              .eq('brand_id', brandId)
+              .eq('type_id', typeId);
+          } else {
+            // 如果不删除原始码，清空原始码中的关联信息
+            await supabase
+              .from('originals')
+              .update({ replica_id: null, scanned: false, scanned_at: null })
+              .eq('brand_id', brandId)
+              .eq('type_id', typeId);
           }
+
+          // 删除副本
+          await supabase
+            .from('replicas')
+            .delete()
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          return new Response(
+            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 原始码批量删除
+        if (endpoint === 'bulk-delete' && pathParts.includes('originals')) {
+          const { brandId, typeId } = await req.json();
+          
+          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // 先查询要删除的原始码数量
+          const { count: deleteCount } = await supabase
+            .from('originals')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          // 删除原始码
+          await supabase
+            .from('originals')
+            .delete()
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
 
           return new Response(
             JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
