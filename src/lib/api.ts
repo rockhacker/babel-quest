@@ -6,33 +6,15 @@
 
 // 获取正确的API基础URL
 function getApiBaseUrl(): string {
-  const hostname = window.location.hostname;
-  
-  // 如果hostname包含这些关键词，说明是开发/预览环境
-  const isLocalOrPreview = hostname === 'localhost' || 
-                          hostname === '127.0.0.1' || 
-                          hostname.includes('lovable') ||
-                          hostname.includes('preview') ||
-                          hostname.includes('dev') ||
-                          hostname.includes('test');
-  
-  return isLocalOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
+  // 总是优先尝试相对路径，让代理或路由处理
+  return '/api';
 }
 
 // 获取请求配置
 function getRequestConfig(): RequestInit {
-  const hostname = window.location.hostname;
-  
-  // 如果hostname包含这些关键词，说明是开发/预览环境
-  const isLocalOrPreview = hostname === 'localhost' || 
-                          hostname === '127.0.0.1' || 
-                          hostname.includes('lovable') ||
-                          hostname.includes('preview') ||
-                          hostname.includes('dev') ||
-                          hostname.includes('test');
-  
+  // 总是使用include以支持cookie认证
   return {
-    credentials: isLocalOrPreview ? 'include' as RequestCredentials : 'omit'
+    credentials: 'include' as RequestCredentials
   };
 }
 
