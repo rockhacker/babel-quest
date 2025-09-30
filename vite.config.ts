@@ -45,16 +45,15 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) => {
           console.log('Original API path:', path);
           if (path.startsWith('/api/login') || path.startsWith('/api/logout') || path.startsWith('/api/me')) {
-            // 提取端点名称，如 login, logout, me
+            // 提取端点名称，如 login, logout, me  
             const endpoint = path.replace('/api/', '');
             const newPath = `/auth/${endpoint}`;
             console.log('Auth path rewritten to:', newPath);
             return newPath;
           }
-          // 对于其他API路径，直接替换前缀
-          const newPath = path.replace('/api', '/api');
-          console.log('General API path rewritten to:', newPath);
-          return newPath;
+          // 对于其他API路径，保持原始路径
+          console.log('General API path kept as:', path);
+          return path;
         }
       }
     }
