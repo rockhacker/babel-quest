@@ -5,15 +5,18 @@ const Redirect = () => {
   const { token } = useParams<{ token: string }>();
 
   useEffect(() => {
+    console.log('Redirect component mounted, token:', token);
+    console.log('Current URL:', window.location.href);
+    
     if (token) {
       // 直接重定向到Supabase边缘函数
       const redirectUrl = `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${token}`;
       console.log('Redirecting to:', redirectUrl);
       
-      // 立即重定向，不等待
-      setTimeout(() => {
-        window.location.replace(redirectUrl);
-      }, 100);
+      // 立即重定向
+      window.location.replace(redirectUrl);
+    } else {
+      console.log('No token found in URL parameters');
     }
   }, [token]);
 

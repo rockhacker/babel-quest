@@ -46,6 +46,7 @@ const App = () => (
               </AdminLayout>
             } />
             <Route path="/admin/r/:token" element={<Redirect />} />
+            <Route path="/r/:token" element={<Redirect />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
