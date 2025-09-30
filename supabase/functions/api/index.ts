@@ -101,20 +101,37 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
     }
 
     const csvContent = csvRows.join('\n');
+    const fileName = `replica_export_${jobId}_${new Date().toISOString().slice(0, 10)}.csv`;
     
-    // 简化版：仅标记为完成，不实际生成文件
-    // 在实际应用中，这里应该将CSV上传到存储服务
+    // 将CSV文件上传到存储桶
+    const { error: uploadError } = await supabase.storage
+      .from('exports')
+      .upload(fileName, csvContent, {
+        contentType: 'text/csv; charset=utf-8',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('文件上传失败:', uploadError);
+      throw uploadError;
+    }
+
+    // 获取文件的公共URL
+    const { data: urlData } = supabase.storage
+      .from('exports')
+      .getPublicUrl(fileName);
+
     await supabase
       .from('export_jobs')
       .update({ 
         status: 'finished',
         completed: total,
         finished_at: new Date().toISOString(),
-        file_path: `replica_export_${jobId}.csv`
+        file_path: urlData.publicUrl
       })
       .eq('id', jobId);
 
-    console.log(`导出任务 ${jobId} 完成`);
+    console.log(`导出任务 ${jobId} 完成，文件保存为: ${fileName}`);
     
   } catch (error) {
     console.error(`导出任务 ${jobId} 失败:`, error);
@@ -375,8 +392,10 @@ Deno.serve(async (req) => {
               total: job.total,
               completed: job.completed,
               progress: progress,
-              file_path: job.file_path,
-              error_message: job.error_message
+              downloadUrl: job.file_path,
+              error: job.error_message,
+              startedAt: job.started_at,
+              finishedAt: job.finished_at
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
