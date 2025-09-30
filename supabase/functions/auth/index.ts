@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
             .select('*')
             .eq('session_id', sessionId)
             .gt('expires_at', new Date().toISOString())
-            .single();
+            .maybeSingle();
 
           if (error || !session) {
             return new Response(

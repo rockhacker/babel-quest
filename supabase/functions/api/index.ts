@@ -175,7 +175,7 @@ async function verifySession(req: Request) {
       .select('*')
       .eq('session_id', sessionId)
       .gt('expires_at', new Date().toISOString())
-      .single();
+      .maybeSingle();
 
     console.log('Session query result:', { session, error });
     
