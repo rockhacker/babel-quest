@@ -6,15 +6,29 @@
 
 // 获取正确的API基础URL
 function getApiBaseUrl(): string {
-  // 总是优先尝试相对路径，让代理或路由处理
-  return '/api';
+  const hostname = window.location.hostname;
+  
+  // 检查是否在开发/预览环境
+  const isDevOrPreview = hostname === 'localhost' || 
+                        hostname === '127.0.0.1' || 
+                        hostname.includes('lovable') ||
+                        hostname.includes('preview');
+  
+  return isDevOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
 }
 
 // 获取请求配置
 function getRequestConfig(): RequestInit {
-  // 总是使用include以支持cookie认证
+  const hostname = window.location.hostname;
+  
+  // 检查是否在开发/预览环境
+  const isDevOrPreview = hostname === 'localhost' || 
+                        hostname === '127.0.0.1' || 
+                        hostname.includes('lovable') ||
+                        hostname.includes('preview');
+  
   return {
-    credentials: 'include' as RequestCredentials
+    credentials: isDevOrPreview ? 'include' as RequestCredentials : 'omit'
   };
 }
 
@@ -25,14 +39,6 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   
   const config = getRequestConfig();
   
-  
-  console.log('API Request Debug:', {
-    hostname: window.location.hostname,
-    baseUrl,
-    endpoint,
-    url,
-    credentials: config.credentials
-  });
   
   const finalOptions: RequestInit = {
     ...config,
