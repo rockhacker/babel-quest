@@ -38,8 +38,12 @@ Deno.serve(async (req) => {
         if (path === 'login') {
           const { username, password } = await req.json();
           
+          console.log('Login attempt:', { username, hasPassword: !!password });
+          console.log('Expected user:', ADMIN_USER);
+          
           // 验证凭据
           if (username !== ADMIN_USER || password !== ADMIN_PASS) {
+            console.log('Login failed: invalid credentials');
             return new Response(
               JSON.stringify({ ok: false, msg: '用户名或密码错误' }),
               { 
