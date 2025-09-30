@@ -31,6 +31,8 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const path = url.pathname.split('/').pop();
+  
+  console.log('Auth request:', { method: req.method, url: req.url, pathname: url.pathname, path });
 
   try {
     switch (req.method) {
