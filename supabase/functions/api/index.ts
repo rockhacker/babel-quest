@@ -215,10 +215,8 @@ Deno.serve(async (req) => {
   let actualEndpoint = endpoint;
   if (req.method === 'DELETE' && pathParts.length >= 2) {
     const secondLast = pathParts[pathParts.length - 2];
-    console.log(`DELETE request: pathParts=${JSON.stringify(pathParts)}, endpoint=${endpoint}, secondLast=${secondLast}`);
     if (secondLast === 'brands' || secondLast === 'types') {
       actualEndpoint = secondLast;
-      console.log(`Corrected actualEndpoint to: ${actualEndpoint}`);
     }
   }
 
@@ -504,7 +502,6 @@ Deno.serve(async (req) => {
 
       case 'DELETE':
         if (actualEndpoint === 'brands') {
-          console.log(`Processing DELETE brands request for ID: ${pathParts[pathParts.length - 1]}`);
           const brandId = pathParts[pathParts.length - 1];
           
           if (!brandId) {
@@ -557,7 +554,6 @@ Deno.serve(async (req) => {
         }
 
         if (actualEndpoint === 'types') {
-          console.log(`Processing DELETE types request for ID: ${pathParts[pathParts.length - 1]}`);
           const typeId = pathParts[pathParts.length - 1];
           
           if (!typeId) {
