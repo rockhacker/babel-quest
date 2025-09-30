@@ -8,6 +8,7 @@ import {
   Database, 
   Activity 
 } from 'lucide-react';
+import { apiRequest } from '@/lib/api';
 
 interface Stats {
   brands: number;
@@ -35,17 +36,7 @@ const Dashboard: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      // 根据环境决定API端点
-      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
-      const apiUrl = isProduction
-        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/stats'
-        : '/api/stats';
-        
-      console.log('Fetching stats from:', apiUrl, 'environment:', isProduction ? 'production' : 'development');
-        
-      const response = await fetch(apiUrl, {
-        credentials: isProduction ? 'omit' : 'include'
-      });
+      const response = await apiRequest('/stats');
       
       console.log('Stats response:', response.status, response.statusText);
       

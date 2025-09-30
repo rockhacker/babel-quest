@@ -133,9 +133,14 @@ const Replicas: React.FC = () => {
 
   const fetchInitialData = async () => {
     try {
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const brandsUrl = isProduction ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands' : '/api/brands';
+      const typesUrl = isProduction ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types' : '/api/types';
+      
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands'),
-        fetch('/api/types'),
+        fetch(brandsUrl, { credentials: isProduction ? 'omit' : 'include' }),
+        fetch(typesUrl, { credentials: isProduction ? 'omit' : 'include' }),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {

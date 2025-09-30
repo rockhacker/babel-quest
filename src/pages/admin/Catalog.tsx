@@ -37,16 +37,32 @@ const Catalog: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const brandsUrl = isProduction
+        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands'
+        : '/api/brands';
+      const typesUrl = isProduction
+        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types'
+        : '/api/types';
+        
+      console.log('Fetching data from:', { brandsUrl, typesUrl });
+        
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands', { credentials: 'include' }),
-        fetch('/api/types', { credentials: 'include' }),
+        fetch(brandsUrl, { credentials: isProduction ? 'omit' : 'include' }),
+        fetch(typesUrl, { credentials: isProduction ? 'omit' : 'include' }),
       ]);
+
+      console.log('Fetch responses:', { brands: brandsRes.status, types: typesRes.status });
 
       if (brandsRes.ok && typesRes.ok) {
         const brandsData = await brandsRes.json();
         const typesData = await typesRes.json();
         setBrands(brandsData);
         setTypes(typesData);
+      } else {
+        console.error('Fetch failed:', { brands: brandsRes.status, types: typesRes.status });
+        throw new Error('Failed to fetch data');
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -74,10 +90,16 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/brands', {
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const apiUrl = isProduction
+        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands'
+        : '/api/brands';
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        credentials: isProduction ? 'omit' : 'include',
         body: JSON.stringify({ name: brandName.trim() }),
       });
 
@@ -122,10 +144,16 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/types', {
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const apiUrl = isProduction
+        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types'
+        : '/api/types';
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        credentials: isProduction ? 'omit' : 'include',
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           name: typeName.trim() 
@@ -167,9 +195,15 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/brands/${brandId}`, {
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const apiUrl = isProduction
+        ? `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands/${brandId}`
+        : `/api/brands/${brandId}`;
+        
+      const response = await fetch(apiUrl, {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: isProduction ? 'omit' : 'include',
       });
 
       const data = await response.json();
@@ -205,9 +239,15 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/types/${typeId}`, {
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const apiUrl = isProduction
+        ? `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types/${typeId}`
+        : `/api/types/${typeId}`;
+        
+      const response = await fetch(apiUrl, {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: isProduction ? 'omit' : 'include',
       });
 
       const data = await response.json();
