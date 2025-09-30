@@ -3,6 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 Deno.serve(async (req) => {
@@ -17,7 +19,9 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(p => p);
-  console.log('Redirect URL:', req.url, 'Path parts:', pathParts);
+  const userAgent = req.headers.get('User-Agent') || 'Unknown';
+  const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
+  console.log('Redirect URL:', req.url, 'Path parts:', pathParts, 'User-Agent:', userAgent, 'Is Mobile:', isMobile);
   
   // Extract token from path like /r/token or /admin/r/token
   const rIndex = pathParts.findIndex(part => part === 'r');
@@ -77,18 +81,40 @@ Deno.serve(async (req) => {
       }
       
       
-      console.log('Redirecting to:', redirectUrl);
-      // 移动端兼容处理：使用301永久重定向，并添加安全头部
-      const headers = {
-        'Location': redirectUrl,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      };
-      return new Response(null, { 
-        status: 301, 
-        headers 
-      });
+      console.log('Redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
+      
+      // 移动端使用不同的重定向策略
+      if (isMobile) {
+        // 移动端使用302临时重定向，添加更多兼容性头部
+        const mobileHeaders = {
+          'Location': redirectUrl,
+          'Cache-Control': 'no-store',
+          'Content-Type': 'text/html',
+          ...corsHeaders
+        };
+        const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>重定向中...</title>
+</head>
+<body>
+  <script>
+    window.location.href = "${redirectUrl}";
+  </script>
+  <p>正在跳转到目标页面...</p>
+  <p><a href="${redirectUrl}">如果没有自动跳转，请点击这里</a></p>
+</body>
+</html>`;
+        return new Response(htmlContent, {
+          status: 200,
+          headers: mobileHeaders
+        });
+      } else {
+        // 桌面端使用标准重定向
+        return Response.redirect(redirectUrl, 302);
+      }
     }
 
     // 未绑定，开始事务绑定流程
@@ -121,18 +147,40 @@ Deno.serve(async (req) => {
     }
     
     
-    console.log('First time binding, redirecting to:', redirectUrl);
-    // 移动端兼容处理：使用301永久重定向，并添加安全头部
-    const headers = {
-      'Location': redirectUrl,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    };
-    return new Response(null, { 
-      status: 301, 
-      headers 
-    });
+    console.log('First time binding, redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
+    
+    // 移动端使用不同的重定向策略
+    if (isMobile) {
+      // 移动端使用302临时重定向，添加更多兼容性头部
+      const mobileHeaders = {
+        'Location': redirectUrl,
+        'Cache-Control': 'no-store',
+        'Content-Type': 'text/html',
+        ...corsHeaders
+      };
+      const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>重定向中...</title>
+</head>
+<body>
+  <script>
+    window.location.href = "${redirectUrl}";
+  </script>
+  <p>正在跳转到目标页面...</p>
+  <p><a href="${redirectUrl}">如果没有自动跳转，请点击这里</a></p>
+</body>
+</html>`;
+      return new Response(htmlContent, {
+        status: 200,
+        headers: mobileHeaders
+      });
+    } else {
+      // 桌面端使用标准重定向
+      return Response.redirect(redirectUrl, 302);
+    }
 
   } catch (error) {
     console.error('Redirect error:', error);
