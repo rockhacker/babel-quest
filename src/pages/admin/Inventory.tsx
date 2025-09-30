@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserMultiFormatReader } from '@zxing/library';
+import { apiRequest } from '@/lib/api';
 
 interface Brand {
   id: string;
@@ -82,7 +83,6 @@ const Inventory: React.FC = () => {
 
   const fetchInitialData = async () => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       const [brandsRes, typesRes] = await Promise.all([
         apiRequest('/brands'),
         apiRequest('/types'),
@@ -116,7 +116,6 @@ const Inventory: React.FC = () => {
       if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
       if (!reset && nextCursor) params.append('cursor', nextCursor);
       
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest(`/originals?${params}`);
       if (response.ok) {
         const data = await response.json();
@@ -146,7 +145,6 @@ const Inventory: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/originals', {
         method: 'POST',
         body: JSON.stringify({ 
@@ -199,7 +197,6 @@ const Inventory: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/originals/bulk-delete', {
         method: 'POST',
         body: JSON.stringify({ 
@@ -361,7 +358,6 @@ const Inventory: React.FC = () => {
     console.log('Auto-submitting to inventory...', qrContent);
     
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/originals', {
         method: 'POST',
         body: JSON.stringify({ 

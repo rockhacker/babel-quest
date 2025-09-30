@@ -8,6 +8,7 @@ import {
   Database, 
   Activity 
 } from 'lucide-react';
+import { apiRequest } from '@/lib/api';
 
 interface Stats {
   brands: number;
@@ -35,7 +36,6 @@ const Dashboard: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/stats');
       if (response.ok) {
         const data = await response.json();

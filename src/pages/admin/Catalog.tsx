@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Package, Plus, Tags, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 
 interface Brand {
   id: string;
@@ -37,7 +38,6 @@ const Catalog: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       const [brandsRes, typesRes] = await Promise.all([
         apiRequest('/brands'),
         apiRequest('/types'),
@@ -75,7 +75,6 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/brands', {
         method: 'POST',
         body: JSON.stringify({ name: brandName.trim() }),
@@ -122,7 +121,6 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/types', {
         method: 'POST',
         body: JSON.stringify({ 
@@ -166,7 +164,6 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest(`/brands/${brandId}`, {
         method: 'DELETE',
       });
@@ -204,7 +201,6 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest(`/types/${typeId}`, {
         method: 'DELETE',
       });

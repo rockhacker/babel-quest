@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { apiRequest } from '@/lib/api';
 
 interface AuthUser {
   username: string;
@@ -31,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/me');
       if (response.ok) {
         const data = await response.json();
@@ -48,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/login', {
         method: 'POST',
         body: JSON.stringify({ username, password }),
@@ -69,7 +68,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       await apiRequest('/logout', { method: 'POST' });
     } catch (error) {
       console.error('Logout failed:', error);

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { apiRequest } from '@/lib/api';
 
 interface Brand {
   id: string;
@@ -133,7 +134,6 @@ const Replicas: React.FC = () => {
 
   const fetchInitialData = async () => {
     try {
-      const { apiRequest } = await import('@/lib/api');
       const [brandsRes, typesRes] = await Promise.all([
         apiRequest('/brands'),
         apiRequest('/types'),
@@ -167,7 +167,6 @@ const Replicas: React.FC = () => {
       if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
       if (!reset && nextCursor) params.append('cursor', nextCursor);
       
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest(`/replicas?${params}`);
       if (response.ok) {
         const data = await response.json();
@@ -236,7 +235,6 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/replicas/generate', {
         method: 'POST',
         body: JSON.stringify({ 
@@ -285,7 +283,6 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/replica_export_jobs', {
         method: 'POST',
         body: JSON.stringify({ 
@@ -332,7 +329,6 @@ const Replicas: React.FC = () => {
     if (!exportJob) return;
 
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest(`/replica_export_jobs/${exportJob.id}`);
       if (response.ok) {
         const data = await response.json();
@@ -392,7 +388,6 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const { apiRequest } = await import('@/lib/api');
       const response = await apiRequest('/replicas/bulk-delete', {
         method: 'POST',
         body: JSON.stringify({ 
