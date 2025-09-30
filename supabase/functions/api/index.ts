@@ -288,6 +288,7 @@ Deno.serve(async (req) => {
           const typeId = url.searchParams.get('typeId');
           const scanned = url.searchParams.get('scanned');
           const cursor = url.searchParams.get('cursor');
+          const page = parseInt(url.searchParams.get('page') || '1');
           const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
 
           let query = supabase.from('originals').select(`
@@ -296,15 +297,36 @@ Deno.serve(async (req) => {
             types (name)
           `);
 
-          if (brandId) query = query.eq('brand_id', brandId);
-          if (typeId) query = query.eq('type_id', typeId);
+          if (brandId && brandId !== 'all') query = query.eq('brand_id', brandId);
+          if (typeId && typeId !== 'all') query = query.eq('type_id', typeId);
           if (scanned === '0') query = query.eq('scanned', false);
           if (scanned === '1') query = query.eq('scanned', true);
-          if (cursor) query = query.lt('id', cursor);
+
+          // 支持两种分页方式：cursor分页（原有方式）和页码分页（新增）
+          if (cursor) {
+            query = query.lt('id', cursor);
+          } else if (page > 1) {
+            const offset = (page - 1) * limit;
+            query = query.range(offset, offset + limit - 1);
+          } else {
+            query = query.limit(limit);
+          }
+
+          // 获取总数用于页码分页
+          let totalCount = 0;
+          if (!cursor && page) {
+            let countQuery = supabase.from('originals').select('*', { count: 'exact', head: true });
+            if (brandId && brandId !== 'all') countQuery = countQuery.eq('brand_id', brandId);
+            if (typeId && typeId !== 'all') countQuery = countQuery.eq('type_id', typeId);
+            if (scanned === '0') countQuery = countQuery.eq('scanned', false);
+            if (scanned === '1') countQuery = countQuery.eq('scanned', true);
+            
+            const { count } = await countQuery;
+            totalCount = count || 0;
+          }
 
           const { data, error } = await query
-            .order('created_at', { ascending: false })
-            .limit(limit);
+            .order('created_at', { ascending: false });
 
           if (error) throw error;
 
@@ -313,10 +335,19 @@ Deno.serve(async (req) => {
             rid: item.id.substring(0, 8)
           }));
 
-          const nextCursor = items.length === limit ? items[items.length - 1].id : null;
+          const nextCursor = cursor && items.length === limit ? items[items.length - 1].id : null;
+          const totalPages = Math.ceil(totalCount / limit);
+          const hasMore = page < totalPages;
 
           return new Response(
-            JSON.stringify({ items, nextCursor }),
+            JSON.stringify({ 
+              items, 
+              nextCursor,
+              totalPages,
+              currentPage: page,
+              hasMore,
+              total: totalCount
+            }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -348,6 +379,7 @@ Deno.serve(async (req) => {
           const batchId = url.searchParams.get('batchId');
           const scanned = url.searchParams.get('scanned');
           const cursor = url.searchParams.get('cursor');
+          const page = parseInt(url.searchParams.get('page') || '1');
           const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
 
           // 从请求头获取前端域名
@@ -364,11 +396,33 @@ Deno.serve(async (req) => {
           if (batchId) query = query.eq('batch_id', batchId);
           if (scanned === '0') query = query.eq('scanned', false);
           if (scanned === '1') query = query.eq('scanned', true);
-          if (cursor) query = query.lt('id', cursor);
+
+          // 支持两种分页方式：cursor分页（原有方式）和页码分页（新增）
+          if (cursor) {
+            query = query.lt('id', cursor);
+          } else if (page > 1) {
+            const offset = (page - 1) * limit;
+            query = query.range(offset, offset + limit - 1);
+          } else {
+            query = query.limit(limit);
+          }
+
+          // 获取总数用于页码分页
+          let totalCount = 0;
+          if (!cursor && page) {
+            let countQuery = supabase.from('replicas').select('*', { count: 'exact', head: true });
+            if (brandId && brandId !== 'all') countQuery = countQuery.eq('brand_id', brandId);
+            if (typeId && typeId !== 'all') countQuery = countQuery.eq('type_id', typeId);
+            if (batchId) countQuery = countQuery.eq('batch_id', batchId);
+            if (scanned === '0') countQuery = countQuery.eq('scanned', false);
+            if (scanned === '1') countQuery = countQuery.eq('scanned', true);
+            
+            const { count } = await countQuery;
+            totalCount = count || 0;
+          }
 
           const { data, error } = await query
-            .order('created_at', { ascending: false })
-            .limit(limit);
+            .order('created_at', { ascending: false });
 
           if (error) throw error;
 
@@ -378,10 +432,19 @@ Deno.serve(async (req) => {
             url: `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${item.token}`
           }));
 
-          const nextCursor = items.length === limit ? items[items.length - 1].id : null;
+          const nextCursor = cursor && items.length === limit ? items[items.length - 1].id : null;
+          const totalPages = Math.ceil(totalCount / limit);
+          const hasMore = page < totalPages;
 
           return new Response(
-            JSON.stringify({ items, nextCursor }),
+            JSON.stringify({ 
+              items, 
+              nextCursor,
+              totalPages,
+              currentPage: page,
+              hasMore,
+              total: totalCount
+            }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
