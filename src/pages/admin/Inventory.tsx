@@ -274,6 +274,13 @@ const Inventory: React.FC = () => {
     console.log('Requesting camera permission...');
     
     try {
+      // 检查 BarcodeDetector 支持情况
+      if (!('BarcodeDetector' in window)) {
+        console.log('BarcodeDetector not supported, falling back...');
+        await scanWithCamera();
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment',
@@ -285,10 +292,10 @@ const Inventory: React.FC = () => {
       console.log('Camera stream obtained:', stream);
       setVideoStream(stream);
       
-      // 等待一下让modal完全显示
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // 等待modal显示
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // 获取视频元素并设置流
+      // 获取视频元素
       const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
       if (!videoElement) {
         throw new Error('Video element not found');
@@ -296,94 +303,94 @@ const Inventory: React.FC = () => {
       
       videoElement.srcObject = stream;
       
-      // 等待视频准备就绪
+      // 等待视频就绪
       await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Video loading timeout'));
-        }, 10000);
+        const timeout = setTimeout(() => reject(new Error('Video timeout')), 10000);
         
         const onCanPlay = () => {
           clearTimeout(timeout);
-          videoElement.removeEventListener('canplay', onCanPlay);
-          videoElement.removeEventListener('error', onError);
-          console.log('Video ready, starting detection...');
+          console.log('Video ready');
           resolve(void 0);
-        };
-        
-        const onError = (e: Event) => {
-          clearTimeout(timeout);
-          videoElement.removeEventListener('canplay', onCanPlay);
-          videoElement.removeEventListener('error', onError);
-          reject(new Error('Video loading failed'));
         };
         
         if (videoElement.readyState >= 3) {
           clearTimeout(timeout);
           resolve(void 0);
         } else {
-          videoElement.addEventListener('canplay', onCanPlay);
-          videoElement.addEventListener('error', onError);
+          videoElement.oncanplay = onCanPlay;
           videoElement.play().catch(reject);
         }
       });
 
-      // 检查 BarcodeDetector 支持
-      if (!('BarcodeDetector' in window)) {
-        throw new Error('BarcodeDetector not supported');
+      // 创建 BarcodeDetector
+      let barcodeDetector;
+      try {
+        barcodeDetector = new (window as any).BarcodeDetector({
+          formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8']
+        });
+        console.log('BarcodeDetector created successfully');
+      } catch (e) {
+        console.log('BarcodeDetector creation failed:', e);
+        await scanWithCamera();
+        return;
       }
 
-      const barcodeDetector = new (window as any).BarcodeDetector({
-        formats: ['qr_code']
-      });
+      let isDetecting = true;
       
-      console.log('BarcodeDetector created, starting detection loop...');
-
       const detectLoop = async () => {
+        if (!isDetecting || !scanning) {
+          console.log('Detection stopped');
+          return;
+        }
+        
         try {
-          if (!scanning) {
-            console.log('Scanning stopped, exiting loop');
-            return;
-          }
-          
-          if (videoElement && videoElement.readyState >= 2) {
+          if (videoElement && videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
             const barcodes = await barcodeDetector.detect(videoElement);
+            
             if (barcodes.length > 0) {
               const qrContent = barcodes[0].rawValue;
               console.log('QR Code detected:', qrContent);
+              
+              isDetecting = false;
               setQrUrl(qrContent);
               
-              // 自动提交
-              if (formBrandId && formTypeId) {
-                console.log('Auto-submitting to inventory...');
-                const response = await fetch('/api/originals', {
-                  method: 'POST',
-                  headers: { 
-                    'Content-Type': 'application/json'
-                  },
-                  credentials: 'include',
-                  body: JSON.stringify({ 
-                    brandId: formBrandId, 
-                    typeId: formTypeId, 
-                    url: qrContent 
-                  }),
-                });
-                
-                const data = await response.json();
-                toast({
-                  title: data.ok ? "扫码入库成功" : "扫码入库失败",
-                  description: data.msg || (data.ok ? "已自动入库" : "入库失败"),
-                  variant: data.ok ? "default" : "destructive",
-                });
-                
-                if (data.ok) {
-                  fetchOriginals(true);
-                }
-              } else {
+              // 检查是否选择了品牌和类型
+              if (!formBrandId || !formTypeId || formBrandId === 'all' || formTypeId === 'all') {
                 toast({
                   title: "扫码成功",
-                  description: "请选择品牌和类型后重新扫码",
+                  description: "请先选择品牌和类型，然后重新扫码进行自动入库",
                   variant: "destructive",
                 });
+                stopScanning();
+                return;
+              }
+              
+              // 自动提交
+              console.log('Auto-submitting to inventory...');
+              const response = await fetch('/api/originals', {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({ 
+                  brandId: formBrandId, 
+                  typeId: formTypeId, 
+                  url: qrContent 
+                }),
+              });
+              
+              const data = await response.json();
+              console.log('API response:', data);
+              
+              toast({
+                title: data.ok ? "扫码入库成功" : "扫码入库失败",
+                description: data.msg || (data.ok ? "已自动入库" : "入库失败"),
+                variant: data.ok ? "default" : "destructive",
+              });
+              
+              if (data.ok) {
+                fetchOriginals(true);
               }
               
               stopScanning();
@@ -391,18 +398,32 @@ const Inventory: React.FC = () => {
             }
           }
           
-          if (scanning) {
-            requestAnimationFrame(detectLoop);
+          // 继续检测
+          if (isDetecting && scanning) {
+            setTimeout(detectLoop, 100); // 降低检测频率以提升性能
           }
         } catch (error) {
           console.error('Detection error:', error);
-          if (scanning) {
-            requestAnimationFrame(detectLoop);
+          if (isDetecting && scanning) {
+            setTimeout(detectLoop, 200);
           }
         }
       };
 
+      // 启动检测循环
+      console.log('Starting detection loop...');
       detectLoop();
+      
+      // 在 3 秒后显示提示
+      setTimeout(() => {
+        if (isDetecting && scanning) {
+          toast({
+            title: "扫码提示",
+            description: "请将二维码对准扫描框，确保光线充足且二维码清晰可见",
+          });
+        }
+      }, 3000);
+      
     } catch (error) {
       console.error('Camera initialization error:', error);
       throw error;
@@ -550,11 +571,18 @@ const Inventory: React.FC = () => {
                     variant="outline"
                     onClick={startScanning}
                     disabled={scanning || submitting}
+                    title="点击启动摄像头扫描二维码"
                   >
                     {scanning ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        扫描中
+                      </>
                     ) : (
-                      <Camera className="h-4 w-4" />
+                      <>
+                        <Camera className="h-4 w-4 mr-1" />
+                        扫码
+                      </>
                     )}
                   </Button>
                 </div>
@@ -750,17 +778,36 @@ const Inventory: React.FC = () => {
               {/* 扫描框覆盖层 */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-48 h-48 border-2 border-white/50 rounded-lg relative">
+                  {/* 扫描动画 */}
+                  {scanning && (
+                    <div className="absolute inset-0 border-2 border-primary animate-pulse rounded-lg"></div>
+                  )}
+                  
+                  {/* 四个角 */}
                   <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg"></div>
                   <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg"></div>
                   <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg"></div>
                   <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg"></div>
                 </div>
               </div>
+              
+              {/* 状态指示器 */}
+              <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+                {scanning ? '正在扫描...' : '摄像头已启动'}
+              </div>
             </div>
             
-            <div className="text-center text-sm text-muted-foreground">
-              <p>将二维码对准扫描框进行扫描</p>
-              <p>确保二维码清晰可见，支持自动识别</p>
+            <div className="text-center text-sm text-muted-foreground space-y-2">
+              <p>🎯 将二维码对准扫描框进行扫描</p>
+              <p>💡 确保二维码清晰可见，光线充足</p>
+              <p>📱 支持 QR 码、条形码等多种格式</p>
+              
+              {(!formBrandId || !formTypeId || formBrandId === 'all' || formTypeId === 'all') && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mt-3">
+                  <p className="text-destructive font-medium">⚠️ 请先选择品牌和类型</p>
+                  <p className="text-destructive text-xs">扫码后将自动添加到库存</p>
+                </div>
+              )}
             </div>
             
             <div className="flex space-x-2">
