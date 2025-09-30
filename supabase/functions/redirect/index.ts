@@ -130,8 +130,11 @@ Deno.serve(async (req) => {
     if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
       redirectUrl = 'https://' + redirectUrl;
     }
+
+    const isFallback = bindingData[0].is_fallback || false;
+    const logPrefix = isFallback ? 'Fallback redirect (no stock)' : 'First time binding';
     
-    console.log('First time binding, redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
+    console.log(`${logPrefix}, redirecting to:`, redirectUrl, 'Is Mobile:', isMobile);
     console.log('User-Agent full:', userAgent);
     console.log('Binding successful, data:', bindingData);
     
