@@ -78,8 +78,17 @@ Deno.serve(async (req) => {
       
       
       console.log('Redirecting to:', redirectUrl);
-      // 直接执行302重定向，不跟随后续重定向
-      return Response.redirect(redirectUrl, 302);
+      // 移动端兼容处理：使用301永久重定向，并添加安全头部
+      const headers = {
+        'Location': redirectUrl,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      };
+      return new Response(null, { 
+        status: 301, 
+        headers 
+      });
     }
 
     // 未绑定，开始事务绑定流程
@@ -113,8 +122,17 @@ Deno.serve(async (req) => {
     
     
     console.log('First time binding, redirecting to:', redirectUrl);
-    // 直接执行302重定向，不跟随后续重定向
-    return Response.redirect(redirectUrl, 302);
+    // 移动端兼容处理：使用301永久重定向，并添加安全头部
+    const headers = {
+      'Location': redirectUrl,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    };
+    return new Response(null, { 
+      status: 301, 
+      headers 
+    });
 
   } catch (error) {
     console.error('Redirect error:', error);
