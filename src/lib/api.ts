@@ -5,7 +5,7 @@
  */
 
 // 获取正确的API基础URL
-function getApiBaseUrl(): string {
+function getApiBaseUrl(endpoint: string): string {
   const hostname = window.location.hostname;
   
   // 检查是否在开发/预览环境 (明确的开发/预览域名)
@@ -14,7 +14,19 @@ function getApiBaseUrl(): string {
                         hostname.includes('lovableproject.com') ||
                         hostname.includes('preview--');
   
-  return isDevOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth';
+  if (isDevOrPreview) {
+    return '/api';
+  }
+  
+  // 生产环境：根据端点类型选择正确的函数
+  const authEndpoints = ['/login', '/logout', '/me'];
+  const isAuthEndpoint = authEndpoints.some(authEndpoint => 
+    endpoint === authEndpoint || endpoint.startsWith(authEndpoint + '/')
+  );
+  
+  return isAuthEndpoint 
+    ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth'
+    : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
 }
 
 // 获取请求配置
@@ -34,7 +46,7 @@ function getRequestConfig(): RequestInit {
 
 // 统一的API请求函数
 export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = getApiBaseUrl(endpoint);
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   
   const config = getRequestConfig();
