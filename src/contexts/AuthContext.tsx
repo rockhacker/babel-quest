@@ -55,16 +55,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string) => {
     try {
       // 根据环境决定API端点
-      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname.includes('lovableproject.com')
-        ? '/api/login'
-        : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/login';
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const apiUrl = isProduction
+        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/login'
+        : '/api/login';
+        
+      console.log('Attempting login to:', apiUrl, 'from:', window.location.hostname);
         
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        credentials: isProduction ? 'omit' : 'include',
         body: JSON.stringify({ username, password }),
       });
 
