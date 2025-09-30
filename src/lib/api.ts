@@ -35,6 +35,14 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   
   const config = getRequestConfig();
   
+  console.log('API Request Debug:', {
+    hostname: window.location.hostname,
+    baseUrl,
+    endpoint,
+    url,
+    credentials: config.credentials
+  });
+  
   const finalOptions: RequestInit = {
     ...config,
     ...options,
