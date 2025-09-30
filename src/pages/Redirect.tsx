@@ -8,8 +8,12 @@ const Redirect = () => {
     if (token) {
       // 直接重定向到Supabase边缘函数
       const redirectUrl = `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${token}`;
-      console.log('Redirecting mobile to:', redirectUrl);
-      window.location.href = redirectUrl;
+      console.log('Redirecting to:', redirectUrl);
+      
+      // 立即重定向，不等待
+      setTimeout(() => {
+        window.location.replace(redirectUrl);
+      }, 100);
     }
   }, [token]);
 
@@ -24,6 +28,10 @@ const Redirect = () => {
             <a 
               href={`https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${token}`}
               className="text-blue-600 underline ml-1"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.replace(`https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${token}`);
+              }}
             >
               点击这里
             </a>
