@@ -60,6 +60,8 @@ Deno.serve(async (req) => {
 
     // 检查是否已绑定原始码
     if (replica.bound_original_id) {
+      console.log('Found replica:', replica.id, 'bound_original_id:', replica.bound_original_id);
+      
       // 已绑定，获取原始码URL并跳转
       const { data: original, error: originalError } = await supabase
         .from('originals')
@@ -67,7 +69,10 @@ Deno.serve(async (req) => {
         .eq('id', replica.bound_original_id)
         .maybeSingle();
 
+      console.log('Original query result:', { data: original, error: originalError });
+
       if (originalError || !original) {
+        console.log('Original missing error:', originalError);
         return new Response('Original missing', { 
           status: 410,
           headers: { 'Content-Type': 'text/plain' }
