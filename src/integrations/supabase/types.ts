@@ -323,6 +323,7 @@ export type Database = {
       bind_replica_to_original: {
         Args: { p_brand_id: string; p_replica_id: string; p_type_id: string }
         Returns: {
+          is_fallback: boolean
           original_url: string
         }[]
       }
