@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
           const items = data.map(item => ({
             ...item,
             rid: item.id,
-            url: `${origin}/r/${item.token}`
+            url: `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${item.token}`
           }));
 
           const nextCursor = items.length === limit ? items[items.length - 1].id : null;
