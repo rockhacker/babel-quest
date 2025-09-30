@@ -96,15 +96,22 @@ Deno.serve(async (req) => {
             );
           }
 
-          // 设置cookie - 为移动端优化
+          // 设置cookie - 兼容Safari和移动端
           const origin = req.headers.get('origin');
+          const userAgent = req.headers.get('user-agent') || '';
           const isSecure = origin?.startsWith('https://');
+          const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
           
-          // 根据环境设置不同的cookie策略
+          // 根据浏览器和环境设置不同的cookie策略
           let cookieValue;
           if (isSecure) {
-            // HTTPS环境：使用SameSite=None; Secure以支持跨域
-            cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`;
+            if (isSafari) {
+              // Safari：使用SameSite=Lax，不使用Secure
+              cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`;
+            } else {
+              // 其他浏览器：使用SameSite=None; Secure以支持跨域
+              cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`;
+            }
           } else {
             // HTTP环境：使用SameSite=Lax（开发环境）
             cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`;
