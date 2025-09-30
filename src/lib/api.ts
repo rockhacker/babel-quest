@@ -14,7 +14,7 @@ function getApiBaseUrl(): string {
                         hostname.includes('lovableproject.com') ||
                         hostname.includes('preview--');
   
-  return isDevOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
+  return isDevOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth';
 }
 
 // 获取请求配置
