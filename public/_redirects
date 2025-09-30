@@ -1,4 +1,6 @@
-# Handle client-side routing
-/admin/r/* /index.html 200
-/r/* /index.html 200
+# Handle redirect routes specifically
+/admin/r/* https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/:splat 302
+/r/* https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/:splat 302
+
+# Handle client-side routing for other routes
 /* /index.html 200
