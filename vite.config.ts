@@ -33,6 +33,15 @@ export default defineConfig(({ mode }) => ({
       '/api': {
         target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1',
         changeOrigin: true,
+        secure: true,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('Proxy error:', err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying request to:', proxyReq.path);
+          });
+        },
         rewrite: (path) => {
           console.log('Rewriting path:', path);
           if (path === '/api/login' || path === '/api/logout' || path === '/api/me') {
