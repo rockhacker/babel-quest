@@ -35,12 +35,26 @@ const Dashboard: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/stats', {
-        credentials: 'include'
+      // 根据环境决定API端点
+      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
+      const apiUrl = isProduction
+        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/stats'
+        : '/api/stats';
+        
+      console.log('Fetching stats from:', apiUrl, 'environment:', isProduction ? 'production' : 'development');
+        
+      const response = await fetch(apiUrl, {
+        credentials: isProduction ? 'omit' : 'include'
       });
+      
+      console.log('Stats response:', response.status, response.statusText);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Stats data received:', data);
         setStats(data);
+      } else {
+        console.error('Stats fetch failed:', response.status, await response.text());
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error);

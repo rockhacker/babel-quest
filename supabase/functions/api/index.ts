@@ -2,7 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cookie',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
 };
 
 // 导出任务处理函数
@@ -151,23 +153,37 @@ async function verifySession(req: Request) {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
+  console.log('Verifying session for request from:', req.headers.get('origin'));
+  
   const cookies = req.headers.get('cookie');
+  console.log('Cookies received:', cookies);
+  
   const sessionId = cookies?.split(';')
     .find(c => c.trim().startsWith('sid='))
     ?.split('=')[1];
 
+  console.log('Session ID extracted:', sessionId);
+
   if (!sessionId) {
+    console.log('No session ID found');
     return null;
   }
 
-  const { data: session, error } = await supabase
-    .from('admin_sessions')
-    .select('*')
-    .eq('session_id', sessionId)
-    .gt('expires_at', new Date().toISOString())
-    .single();
+  try {
+    const { data: session, error } = await supabase
+      .from('admin_sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .gt('expires_at', new Date().toISOString())
+      .single();
 
-  return error || !session ? null : session;
+    console.log('Session query result:', { session, error });
+    
+    return error || !session ? null : session;
+  } catch (error) {
+    console.log('Session verification error:', error);
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
