@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
               headers: { 
                 ...corsHeaders, 
                 'Content-Type': 'application/json',
-                'Set-Cookie': `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`
+                'Set-Cookie': `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax; Secure`
               }
             }
           );
