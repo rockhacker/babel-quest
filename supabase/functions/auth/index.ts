@@ -96,14 +96,27 @@ Deno.serve(async (req) => {
             );
           }
 
-          // 设置cookie
+          // 设置cookie - 为移动端优化
+          const origin = req.headers.get('origin');
+          const isSecure = origin?.startsWith('https://');
+          
+          // 根据环境设置不同的cookie策略
+          let cookieValue;
+          if (isSecure) {
+            // HTTPS环境：使用SameSite=None; Secure以支持跨域
+            cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`;
+          } else {
+            // HTTP环境：使用SameSite=Lax（开发环境）
+            cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`;
+          }
+          
           const response = new Response(
             JSON.stringify({ ok: true }),
             { 
               headers: { 
                 ...corsHeaders, 
                 'Content-Type': 'application/json',
-                'Set-Cookie': `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`
+                'Set-Cookie': cookieValue
               }
             }
           );
