@@ -286,17 +286,32 @@ const Inventory: React.FC = () => {
     try {
       const codeReader = codeReaderRef.current!;
       
-      // 等待modal显示完成
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 等待modal完全显示并渲染完成
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (!videoRef.current) {
-        throw new Error('Video element not found');
+      // 多次尝试获取video元素，直到找到为止
+      let videoElement = videoRef.current;
+      let attempts = 0;
+      while (!videoElement && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        videoElement = videoRef.current;
+        attempts++;
+        console.log(`Attempt ${attempts}: Looking for video element...`);
       }
+      
+      if (!videoElement) {
+        throw new Error('Video element still not found after multiple attempts');
+      }
+      
+      console.log('Video element found, starting scan...');
+
+      
+      console.log('Video element found, starting scan...');
 
       // 使用ZXing开始扫描
-      await codeReader.decodeFromVideoDevice(
+      const result = await codeReader.decodeFromVideoDevice(
         undefined, // 使用默认摄像头
-        videoRef.current,
+        videoElement,
         (result, error) => {
           if (result) {
             const qrContent = result.getText();
@@ -327,6 +342,12 @@ const Inventory: React.FC = () => {
       );
       
       console.log('ZXing scanner initialized successfully');
+      
+      // 显示成功提示
+      toast({
+        title: "摄像头已启动",
+        description: "请将二维码对准扫描框进行识别",
+      });
       
     } catch (error) {
       console.error('ZXing initialization error:', error);
