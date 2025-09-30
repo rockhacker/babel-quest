@@ -402,7 +402,115 @@ Deno.serve(async (req) => {
         break;
 
       case 'DELETE':
-        // 删除方法暂时不处理批量删除，所有批量删除都在POST方法中处理
+        if (endpoint === 'brands') {
+          const brandId = pathParts[pathParts.length - 1];
+          
+          if (!brandId) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '品牌ID不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 检查是否有关联的类型
+          const { data: types, error: typesError } = await supabase
+            .from('types')
+            .select('id')
+            .eq('brand_id', brandId)
+            .limit(1);
+
+          if (typesError) {
+            console.error('检查类型时出错:', typesError);
+            throw typesError;
+          }
+
+          if (types && types.length > 0) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '无法删除品牌：该品牌下还有类型，请先删除所有类型' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 删除品牌
+          const { error: deleteError } = await supabase
+            .from('brands')
+            .delete()
+            .eq('id', brandId);
+
+          if (deleteError) {
+            console.error('删除品牌时出错:', deleteError);
+            throw deleteError;
+          }
+
+          return new Response(
+            JSON.stringify({ ok: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'types') {
+          const typeId = pathParts[pathParts.length - 1];
+          
+          if (!typeId) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '类型ID不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 检查是否有关联的副本或原始码
+          const [replicasRes, originalsRes] = await Promise.all([
+            supabase.from('replicas').select('id').eq('type_id', typeId).limit(1),
+            supabase.from('originals').select('id').eq('type_id', typeId).limit(1)
+          ]);
+
+          if (replicasRes.error) {
+            console.error('检查副本时出错:', replicasRes.error);
+            throw replicasRes.error;
+          }
+          
+          if (originalsRes.error) {
+            console.error('检查原始码时出错:', originalsRes.error);
+            throw originalsRes.error;
+          }
+
+          if ((replicasRes.data && replicasRes.data.length > 0) || (originalsRes.data && originalsRes.data.length > 0)) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '无法删除类型：该类型下还有副本或原始码数据' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 删除类型
+          const { error: deleteError } = await supabase
+            .from('types')
+            .delete()
+            .eq('id', typeId);
+
+          if (deleteError) {
+            console.error('删除类型时出错:', deleteError);
+            throw deleteError;
+          }
+
+          return new Response(
+            JSON.stringify({ ok: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        break;
 
       case 'POST':
         if (endpoint === 'brands') {

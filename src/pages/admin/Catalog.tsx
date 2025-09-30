@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Package, Plus, Tags } from 'lucide-react';
+import { Package, Plus, Tags, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Brand {
@@ -160,6 +160,82 @@ const Catalog: React.FC = () => {
     }
   };
 
+  const handleDeleteBrand = async (brandId: string, brandName: string) => {
+    if (!confirm(`确定要删除品牌"${brandName}"吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/brands/${brandId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+      
+      if (data.ok) {
+        toast({
+          title: "删除成功",
+          description: "品牌已删除",
+        });
+        fetchData();
+      } else {
+        toast({
+          title: "删除失败",
+          description: data.msg || "删除品牌失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "网络错误",
+        description: "请检查网络连接后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteType = async (typeId: string, typeName: string) => {
+    if (!confirm(`确定要删除类型"${typeName}"吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/types/${typeId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+      
+      if (data.ok) {
+        toast({
+          title: "删除成功",
+          description: "类型已删除",
+        });
+        fetchData();
+      } else {
+        toast({
+          title: "删除失败",
+          description: data.msg || "删除类型失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "网络错误",
+        description: "请检查网络连接后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getTypesByBrand = (brandId: string) => {
     return types.filter(type => type.brand_id === brandId);
   };
@@ -297,21 +373,41 @@ const Catalog: React.FC = () => {
                 return (
                   <div key={brand.id} className="p-4 border border-border rounded-lg hover:shadow-card transition-shadow">
                     <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-foreground">{brand.name}</h3>
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-foreground">{brand.name}</h3>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteBrand(brand.id, brand.name)}
+                            disabled={submitting}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {brandTypes.length === 0 ? (
                             <span className="text-sm text-muted-foreground">暂无类型</span>
                           ) : (
                             brandTypes.map((type) => (
-                              <Badge key={type.id} variant="secondary">
-                                {type.name}
-                              </Badge>
+                              <div key={type.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded-md">
+                                <span className="text-sm text-secondary-foreground">{type.name}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleDeleteType(type.id, type.name)}
+                                  disabled={submitting}
+                                  className="h-auto p-0 text-destructive hover:text-destructive hover:bg-destructive/10 ml-1"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             ))
                           )}
                         </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground ml-4">
                         {brandTypes.length} 个类型
                       </div>
                     </div>
