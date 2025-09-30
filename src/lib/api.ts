@@ -40,7 +40,7 @@ function getRequestConfig(): RequestInit {
                         hostname.includes('preview--');
   
   return {
-    credentials: isDevOrPreview ? 'include' as RequestCredentials : 'omit'
+    credentials: 'include' as RequestCredentials  // 始终包含 cookies
   };
 }
 
