@@ -1,9 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// 动态获取CORS headers
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin');
+  const allowedOrigins = [
+    'https://babel-quest.lovable.app',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ];
+  
+  // 检查是否是 lovableproject.com 子域名
+  const isLovableProject = origin && origin.includes('lovableproject.com');
+  const isAllowed = allowedOrigins.includes(origin || '') || isLovableProject;
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed && origin ? origin : 'https://babel-quest.lovable.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 // 导出任务处理函数
 async function processExportJob(jobId: string, brandId: string | null, typeId: string | null, supabase: any) {
@@ -171,6 +186,8 @@ async function verifySession(req: Request) {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
