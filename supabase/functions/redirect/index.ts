@@ -82,7 +82,63 @@ Deno.serve(async (req) => {
       
       console.log('Redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
       
-      return Response.redirect(redirectUrl, 302);
+      // 为移动端和Safari使用HTML重定向，其他使用HTTP重定向
+      if (isMobile || userAgent.includes('Safari')) {
+        const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+  <title>重定向中...</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #ddd; border-top: 4px solid #007AFF; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    a { color: #007AFF; text-decoration: none; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <p>正在跳转...</p>
+  <p><a href="${redirectUrl}" onclick="window.location.href='${redirectUrl}'; return false;">点击这里立即跳转</a></p>
+  
+  <script>
+    (function() {
+      // 多种重定向方法确保兼容性
+      try {
+        window.location.replace("${redirectUrl}");
+      } catch(e) {
+        try {
+          window.location.href = "${redirectUrl}";
+        } catch(e2) {
+          window.open("${redirectUrl}", "_self");
+        }
+      }
+      
+      // 备用定时器
+      setTimeout(function() {
+        window.location.href = "${redirectUrl}";
+      }, 500);
+    })();
+  </script>
+</body>
+</html>`;
+        
+        return new Response(htmlContent, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...corsHeaders
+          }
+        });
+      } else {
+        // 桌面Chrome等使用HTTP重定向
+        return Response.redirect(redirectUrl, 302);
+      }
     }
 
     // 未绑定，开始事务绑定流程
