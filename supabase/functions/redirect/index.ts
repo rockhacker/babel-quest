@@ -21,7 +21,15 @@ Deno.serve(async (req) => {
   
   // Extract token from path like /r/token or /admin/r/token
   const rIndex = pathParts.findIndex(part => part === 'r');
-  const token = rIndex >= 0 && rIndex < pathParts.length - 1 ? pathParts[rIndex + 1] : pathParts[pathParts.length - 1];
+  const token = rIndex >= 0 && rIndex < pathParts.length - 1 ? pathParts[rIndex + 1] : null;
+  
+  if (!token) {
+    console.log('No token found in path:', url.pathname);
+    return new Response('Token not found', { 
+      status: 400,
+      headers: { 'Content-Type': 'text/plain' }
+    });
+  }
 
   if (req.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 });

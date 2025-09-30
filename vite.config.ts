@@ -9,6 +9,15 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
+      '/admin/r': {
+        target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect',
+        changeOrigin: true,
+        rewrite: (path) => {
+          console.log('Redirecting admin path:', path);
+          // 将 /admin/r/token 转换为 /r/token
+          return path.replace('/admin', '');
+        }
+      },
       '/r': {
         target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect',
         changeOrigin: true,
