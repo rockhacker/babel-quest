@@ -10,6 +10,7 @@ import Dashboard from "@/pages/admin/Dashboard";
 import Catalog from "@/pages/admin/Catalog";
 import Inventory from "@/pages/admin/Inventory";
 import Replicas from "@/pages/admin/Replicas";
+import Redirect from "@/pages/Redirect";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
                 <Replicas />
               </AdminLayout>
             } />
+            <Route path="/admin/r/:token" element={<Redirect />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
