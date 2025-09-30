@@ -104,7 +104,7 @@ export type Database = {
       export_jobs: {
         Row: {
           base_url: string | null
-          brand_id: string
+          brand_id: string | null
           completed: number | null
           created_at: string | null
           error_message: string | null
@@ -114,12 +114,12 @@ export type Database = {
           started_at: string | null
           status: Database["public"]["Enums"]["export_status"] | null
           total: number | null
-          type_id: string
+          type_id: string | null
           updated_at: string | null
         }
         Insert: {
           base_url?: string | null
-          brand_id: string
+          brand_id?: string | null
           completed?: number | null
           created_at?: string | null
           error_message?: string | null
@@ -129,12 +129,12 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["export_status"] | null
           total?: number | null
-          type_id: string
+          type_id?: string | null
           updated_at?: string | null
         }
         Update: {
           base_url?: string | null
-          brand_id?: string
+          brand_id?: string | null
           completed?: number | null
           created_at?: string | null
           error_message?: string | null
@@ -144,7 +144,7 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["export_status"] | null
           total?: number | null
-          type_id?: string
+          type_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
