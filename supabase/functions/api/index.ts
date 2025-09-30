@@ -32,10 +32,11 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
         types!inner(name)
       `);
 
-    if (brandId) {
+    // 只有当brandId和typeId不是"all"且不为空时才添加筛选条件
+    if (brandId && brandId !== 'all') {
       query = query.eq('brand_id', brandId);
     }
-    if (typeId) {
+    if (typeId && typeId !== 'all') {
       query = query.eq('type_id', typeId);
     }
 
