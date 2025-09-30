@@ -31,7 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/me', {
+      // 根据环境决定API端点
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname.includes('lovableproject.com')
+        ? '/api/me'
+        : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/me';
+        
+      const response = await fetch(apiUrl, {
         credentials: 'include'
       });
       if (response.ok) {
@@ -49,7 +54,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     try {
-      const response = await fetch('/api/login', {
+      // 根据环境决定API端点
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname.includes('lovableproject.com')
+        ? '/api/login'
+        : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/login';
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await fetch('/api/logout', { 
+      // 根据环境决定API端点
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname.includes('lovableproject.com')
+        ? '/api/logout'
+        : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/logout';
+        
+      await fetch(apiUrl, { 
         method: 'POST',
         credentials: 'include'
       });
