@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试重定向</title>
+</head>
+<body>
+    <h1>重定向测试页面</h1>
+    <p>Token: <span id="token"></span></p>
+    <p>当前URL: <span id="currentUrl"></span></p>
+    
+    <button onclick="testRedirect()">测试重定向</button>
+    
+    <script>
+        // 获取URL参数中的token
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token') || '89b6e8c26ca848d8';
+        
+        document.getElementById('token').textContent = token;
+        document.getElementById('currentUrl').textContent = window.location.href;
+        
+        function testRedirect() {
+            console.log('Testing redirect for token:', token);
+            const redirectUrl = `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${token}`;
+            console.log('Redirecting to:', redirectUrl);
+            window.location.href = redirectUrl;
+        }
+        
+        // 如果URL路径包含 /test-redirect，自动执行重定向测试
+        if (window.location.pathname.includes('test-redirect')) {
+            setTimeout(testRedirect, 1000);
+        }
+    </script>
+</body>
+</html>

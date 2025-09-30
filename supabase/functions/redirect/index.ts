@@ -80,54 +80,9 @@ Deno.serve(async (req) => {
         redirectUrl = 'https://' + redirectUrl;
       }
       
-      
       console.log('Redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
       
-      // 对所有设备都使用HTML重定向，确保兼容性
-      const htmlHeaders = {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Content-Type': 'text/html; charset=utf-8',
-        ...corsHeaders
-      };
-      
-      const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>重定向中...</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-    .loading { animation: spin 1s linear infinite; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div class="loading">🔄</div>
-  <p>正在跳转到目标页面...</p>
-  <p><a href="${redirectUrl}" onclick="window.location.href='${redirectUrl}'; return false;">如果没有自动跳转，请点击这里</a></p>
-  
-  <script>
-    // 立即跳转
-    window.location.replace("${redirectUrl}");
-    
-    // 备用跳转方法
-    setTimeout(function() {
-      window.location.href = "${redirectUrl}";
-    }, 1000);
-    
-    // 第三种备用方法
-    setTimeout(function() {
-      window.open("${redirectUrl}", "_self");
-    }, 2000);
-  </script>
-</body>
-</html>`;
-      
-      return new Response(htmlContent, {
-        status: 200,
-        headers: htmlHeaders
-      });
+      return Response.redirect(redirectUrl, 302);
     }
 
     // 未绑定，开始事务绑定流程
