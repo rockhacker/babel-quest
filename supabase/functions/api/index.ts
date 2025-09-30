@@ -19,7 +19,7 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
       })
       .eq('id', jobId);
 
-    // 构建查询条件
+    // 构建查询条件 - 只查询未扫描的副本
     let query = supabase
       .from('replicas')
       .select(`
@@ -30,7 +30,8 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
         created_at,
         brands!inner(name),
         types!inner(name)
-      `);
+      `)
+      .eq('scanned', false); // 只导出未扫描的副本
 
     // 只有当brandId和typeId不是"all"且不为空时才添加筛选条件
     if (brandId && brandId !== 'all') {
@@ -71,13 +72,11 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
     }
 
     // 处理副本数据，生成CSV格式数据
-    const csvRows = ['序号,Token,QR码链接,品牌,类型,状态,扫描时间,创建时间'];
+    const csvRows = ['序号,Token,QR码链接,品牌,类型,创建时间'];
     
     for (let i = 0; i < replicas.length; i++) {
       const replica = replicas[i];
       const qrUrl = `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${replica.token}`;
-      const status = replica.scanned ? '已扫描' : '未扫描';
-      const scannedAt = replica.scanned_at ? new Date(replica.scanned_at).toLocaleString('zh-CN') : '';
       const createdAt = new Date(replica.created_at).toLocaleString('zh-CN');
       
       csvRows.push([
@@ -86,8 +85,6 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
         qrUrl,
         replica.brands?.name || '',
         replica.types?.name || '',
-        status,
-        scannedAt,
         createdAt
       ].map(field => `"${field}"`).join(','));
 
