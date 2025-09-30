@@ -37,9 +37,10 @@ const Catalog: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      const { apiRequest } = await import('@/lib/api');
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands', { credentials: 'include' }),
-        fetch('/api/types', { credentials: 'include' }),
+        apiRequest('/brands'),
+        apiRequest('/types'),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {
@@ -74,10 +75,9 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/brands', {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest('/brands', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ name: brandName.trim() }),
       });
 
@@ -122,10 +122,9 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/types', {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest('/types', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           name: typeName.trim() 
@@ -167,9 +166,9 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/brands/${brandId}`, {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest(`/brands/${brandId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       const data = await response.json();
@@ -205,9 +204,9 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/types/${typeId}`, {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest(`/types/${typeId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       const data = await response.json();

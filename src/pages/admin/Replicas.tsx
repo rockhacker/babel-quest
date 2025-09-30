@@ -133,9 +133,10 @@ const Replicas: React.FC = () => {
 
   const fetchInitialData = async () => {
     try {
+      const { apiRequest } = await import('@/lib/api');
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands'),
-        fetch('/api/types'),
+        apiRequest('/brands'),
+        apiRequest('/types'),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {
@@ -166,7 +167,8 @@ const Replicas: React.FC = () => {
       if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
       if (!reset && nextCursor) params.append('cursor', nextCursor);
       
-      const response = await fetch(`/api/replicas?${params}`);
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest(`/replicas?${params}`);
       if (response.ok) {
         const data = await response.json();
         // 对副本进行排序：已扫描的在前面，按扫描时间倒序；未扫描的在后面，按创建时间倒序
@@ -234,9 +236,9 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/replicas/generate', {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest('/replicas/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: genBrandId, 
           typeId: genTypeId, 
@@ -283,9 +285,9 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/replica_export_jobs', {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest('/replica_export_jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           typeId: selectedTypeId,
@@ -330,7 +332,8 @@ const Replicas: React.FC = () => {
     if (!exportJob) return;
 
     try {
-      const response = await fetch(`/api/replica_export_jobs/${exportJob.id}`);
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest(`/replica_export_jobs/${exportJob.id}`);
       if (response.ok) {
         const data = await response.json();
         if (data.ok) {
@@ -389,9 +392,9 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/replicas/bulk-delete', {
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest('/replicas/bulk-delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           typeId: selectedTypeId,

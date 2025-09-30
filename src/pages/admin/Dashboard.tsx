@@ -35,9 +35,8 @@ const Dashboard: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/stats', {
-        credentials: 'include'
-      });
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest('/stats');
       if (response.ok) {
         const data = await response.json();
         setStats(data);

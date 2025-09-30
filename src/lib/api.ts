@@ -1,0 +1,64 @@
+/**
+ * API工具类 - 处理不同环境下的API调用
+ * 开发环境使用 /api/*
+ * 生产环境使用完整的Supabase边缘函数URL
+ */
+
+// 获取正确的API基础URL
+function getApiBaseUrl(): string {
+  const hostname = window.location.hostname;
+  
+  // 检查是否在生产环境（非localhost和非预览域名）
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com')) {
+    return 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
+  }
+  
+  // 开发环境和预览环境使用相对路径
+  return '/api';
+}
+
+// 获取请求配置
+function getRequestConfig(): RequestInit {
+  const hostname = window.location.hostname;
+  
+  return {
+    credentials: hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com') 
+      ? 'omit'  // 生产环境避免跨域cookie问题
+      : 'include' as RequestCredentials  // 开发环境包含cookies
+  };
+}
+
+// 统一的API请求函数
+export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  
+  const config = getRequestConfig();
+  
+  const finalOptions: RequestInit = {
+    ...config,
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  };
+
+  return fetch(url, finalOptions);
+}
+
+// 便捷方法
+export const api = {
+  get: (endpoint: string) => apiRequest(endpoint),
+  post: (endpoint: string, data?: any) => apiRequest(endpoint, {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
+  }),
+  put: (endpoint: string, data?: any) => apiRequest(endpoint, {
+    method: 'PUT', 
+    body: data ? JSON.stringify(data) : undefined,
+  }),
+  delete: (endpoint: string) => apiRequest(endpoint, {
+    method: 'DELETE',
+  }),
+};
