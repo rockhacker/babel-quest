@@ -8,11 +8,11 @@
 function getApiBaseUrl(): string {
   const hostname = window.location.hostname;
   
-  // 检查是否在开发/预览环境
+  // 检查是否在开发/预览环境 (明确的开发/预览域名)
   const isDevOrPreview = hostname === 'localhost' || 
                         hostname === '127.0.0.1' || 
-                        hostname.includes('lovable') ||
-                        hostname.includes('preview');
+                        hostname.includes('lovableproject.com') ||
+                        hostname.includes('preview--');
   
   return isDevOrPreview ? '/api' : 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
 }
@@ -21,11 +21,11 @@ function getApiBaseUrl(): string {
 function getRequestConfig(): RequestInit {
   const hostname = window.location.hostname;
   
-  // 检查是否在开发/预览环境
+  // 检查是否在开发/预览环境 (明确的开发/预览域名)
   const isDevOrPreview = hostname === 'localhost' || 
                         hostname === '127.0.0.1' || 
-                        hostname.includes('lovable') ||
-                        hostname.includes('preview');
+                        hostname.includes('lovableproject.com') ||
+                        hostname.includes('preview--');
   
   return {
     credentials: isDevOrPreview ? 'include' as RequestCredentials : 'omit'
