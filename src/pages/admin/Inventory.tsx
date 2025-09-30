@@ -228,21 +228,31 @@ const Inventory: React.FC = () => {
   };
 
   const startScanning = async () => {
+    console.log('Starting camera scan...', { formBrandId, formTypeId });
     setScanning(true);
     setShowCameraModal(true);
+    
     try {
+      // 首先检查摄像头权限
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('摄像头不支持或被禁用');
+      }
+
       // 检查浏览器是否支持 BarcodeDetector
       if ('BarcodeDetector' in window) {
+        console.log('Using BarcodeDetector API');
         await scanWithBarcodeDetector();
       } else {
+        console.log('BarcodeDetector not supported, falling back to camera preview');
         // 回退到摄像头预览 + 手动输入
         await scanWithCamera();
       }
     } catch (error) {
       console.error('Scanning error:', error);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
       toast({
         title: "扫码失败",
-        description: "无法启动摄像头或扫码功能",
+        description: `无法启动摄像头: ${errorMessage}`,
         variant: "destructive",
       });
       setShowCameraModal(false);
@@ -261,106 +271,179 @@ const Inventory: React.FC = () => {
   };
 
   const scanWithBarcodeDetector = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: 'environment' } 
-    });
+    console.log('Requesting camera permission...');
     
-    setVideoStream(stream);
-    
-    // 获取视频元素并设置流
-    const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
-    if (videoElement) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      
+      console.log('Camera stream obtained:', stream);
+      setVideoStream(stream);
+      
+      // 等待一下让modal完全显示
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 获取视频元素并设置流
+      const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
+      if (!videoElement) {
+        throw new Error('Video element not found');
+      }
+      
       videoElement.srcObject = stream;
-      videoElement.play();
       
       // 等待视频准备就绪
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Video loading timeout'));
+        }, 10000);
+        
         const onCanPlay = () => {
+          clearTimeout(timeout);
           videoElement.removeEventListener('canplay', onCanPlay);
+          videoElement.removeEventListener('error', onError);
+          console.log('Video ready, starting detection...');
           resolve(void 0);
         };
+        
+        const onError = (e: Event) => {
+          clearTimeout(timeout);
+          videoElement.removeEventListener('canplay', onCanPlay);
+          videoElement.removeEventListener('error', onError);
+          reject(new Error('Video loading failed'));
+        };
+        
         if (videoElement.readyState >= 3) {
+          clearTimeout(timeout);
           resolve(void 0);
         } else {
           videoElement.addEventListener('canplay', onCanPlay);
+          videoElement.addEventListener('error', onError);
+          videoElement.play().catch(reject);
         }
       });
-    }
 
-    const barcodeDetector = new (window as any).BarcodeDetector({
-      formats: ['qr_code']
-    });
+      // 检查 BarcodeDetector 支持
+      if (!('BarcodeDetector' in window)) {
+        throw new Error('BarcodeDetector not supported');
+      }
 
-    const detectLoop = async () => {
-      try {
-        if (videoElement && videoElement.readyState >= 2) { // 确保视频已加载
-          const barcodes = await barcodeDetector.detect(videoElement);
-          if (barcodes.length > 0) {
-            const qrContent = barcodes[0].rawValue;
-            setQrUrl(qrContent);
-            
-            // 自动提交
-            if (formBrandId && formTypeId) {
-              const response = await fetch('/api/originals', {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  credentials: 'include'
-                },
-                credentials: 'include',
-                body: JSON.stringify({ 
-                  brandId: formBrandId, 
-                  typeId: formTypeId, 
-                  url: qrContent 
-                }),
-              });
-              
-              const data = await response.json();
-              toast({
-                title: data.ok ? "扫码入库成功" : "扫码入库失败",
-                description: data.msg || (data.ok ? "已自动入库" : "入库失败"),
-                variant: data.ok ? "default" : "destructive",
-              });
-              
-              if (data.ok) {
-                fetchOriginals(true);
-              }
-            }
-            
-            stopScanning();
+      const barcodeDetector = new (window as any).BarcodeDetector({
+        formats: ['qr_code']
+      });
+      
+      console.log('BarcodeDetector created, starting detection loop...');
+
+      const detectLoop = async () => {
+        try {
+          if (!scanning) {
+            console.log('Scanning stopped, exiting loop');
             return;
           }
+          
+          if (videoElement && videoElement.readyState >= 2) {
+            const barcodes = await barcodeDetector.detect(videoElement);
+            if (barcodes.length > 0) {
+              const qrContent = barcodes[0].rawValue;
+              console.log('QR Code detected:', qrContent);
+              setQrUrl(qrContent);
+              
+              // 自动提交
+              if (formBrandId && formTypeId) {
+                console.log('Auto-submitting to inventory...');
+                const response = await fetch('/api/originals', {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json'
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify({ 
+                    brandId: formBrandId, 
+                    typeId: formTypeId, 
+                    url: qrContent 
+                  }),
+                });
+                
+                const data = await response.json();
+                toast({
+                  title: data.ok ? "扫码入库成功" : "扫码入库失败",
+                  description: data.msg || (data.ok ? "已自动入库" : "入库失败"),
+                  variant: data.ok ? "default" : "destructive",
+                });
+                
+                if (data.ok) {
+                  fetchOriginals(true);
+                }
+              } else {
+                toast({
+                  title: "扫码成功",
+                  description: "请选择品牌和类型后重新扫码",
+                  variant: "destructive",
+                });
+              }
+              
+              stopScanning();
+              return;
+            }
+          }
+          
+          if (scanning) {
+            requestAnimationFrame(detectLoop);
+          }
+        } catch (error) {
+          console.error('Detection error:', error);
+          if (scanning) {
+            requestAnimationFrame(detectLoop);
+          }
         }
-        
-        if (scanning) {
-          requestAnimationFrame(detectLoop);
-        }
-      } catch (error) {
-        console.error('Detection error:', error);
-      }
-    };
+      };
 
-    detectLoop();
+      detectLoop();
+    } catch (error) {
+      console.error('Camera initialization error:', error);
+      throw error;
+    }
   };
 
   const scanWithCamera = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: 'environment' } 
-    });
+    console.log('Starting camera preview (fallback mode)...');
     
-    setVideoStream(stream);
-    
-    // 获取视频元素并设置流
-    const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
-    if (videoElement) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      
+      console.log('Camera stream obtained for preview');
+      setVideoStream(stream);
+      
+      // 等待一下让modal完全显示
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 获取视频元素并设置流
+      const videoElement = document.getElementById('camera-video') as HTMLVideoElement;
+      if (!videoElement) {
+        throw new Error('Video element not found');
+      }
+      
       videoElement.srcObject = stream;
-      videoElement.play();
-    }
+      await videoElement.play();
 
-    toast({
-      title: "摄像头已启动",
-      description: "请对准二维码进行扫描，或手动输入二维码内容",
-    });
+      toast({
+        title: "摄像头已启动",
+        description: "自动识别不可用，请手动输入二维码内容或点击手动输入按钮",
+      });
+    } catch (error) {
+      console.error('Camera preview error:', error);
+      throw error;
+    }
   };
 
   const getFilteredTypes = () => {
