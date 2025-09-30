@@ -18,23 +18,25 @@ function checkGlobalRedirect() {
     const redirectUrl = `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${token}`;
     console.log('Global redirecting to:', redirectUrl);
     
-    // 在页面上显示重定向信息，便于调试
+    // 显示重定向页面
     document.body.innerHTML = `
-      <div style="padding: 20px; font-family: Arial;">
-        <h2>重定向调试信息</h2>
-        <p>当前路径: ${path}</p>
-        <p>检测到Token: ${token}</p>
-        <p>重定向URL: ${redirectUrl}</p>
-        <p>User Agent: ${navigator.userAgent}</p>
-        <p>正在重定向...</p>
-        <a href="${redirectUrl}" style="color: blue;">点击这里手动跳转</a>
+      <div style="padding: 20px; font-family: Arial; text-align: center; background: #f5f5f5; min-height: 100vh; display: flex; flex-direction: column; justify-content: center;">
+        <div style="max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="width: 40px; height: 40px; border: 4px solid #ddd; border-top: 4px solid #007AFF; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+          <h2 style="margin: 0 0 15px; color: #333;">正在跳转...</h2>
+          <p style="color: #666; margin: 0 0 20px;">检测到Token: ${token}</p>
+          <a href="${redirectUrl}" style="color: #007AFF; text-decoration: none; font-size: 16px;" onclick="window.location.href='${redirectUrl}'; return false;">点击这里手动跳转</a>
+        </div>
+        <style>
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
       </div>
     `;
     
-    // 立即重定向，不加载React应用
+    // 立即重定向
     setTimeout(() => {
       window.location.replace(redirectUrl);
-    }, 1000);
+    }, 500);
     return true;
   }
   return false;
