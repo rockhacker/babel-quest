@@ -44,7 +44,6 @@ const App = () => (
                 <Replicas />
               </AdminLayout>
             } />
-            <Route path="/r/*" element={<div>Redirecting...</div>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

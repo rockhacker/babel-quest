@@ -12,7 +12,10 @@ export default defineConfig(({ mode }) => ({
       '/r': {
         target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/r', '')
+        rewrite: (path) => {
+          console.log('Redirecting path:', path);
+          return path; // 保持原路径，让redirect函数处理token提取
+        }
       },
       '/api': {
         target: 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1',
