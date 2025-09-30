@@ -8,23 +8,26 @@
 function getApiBaseUrl(): string {
   const hostname = window.location.hostname;
   
-  // 检查是否在生产环境（非localhost和非预览域名）
-  if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com') && !hostname.includes('lovable.app')) {
-    return 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
+  // 检查是否在开发环境或预览环境
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || 
+      hostname.includes('lovableproject.com') || hostname.includes('lovable.app')) {
+    return '/api';
   }
   
-  // 开发环境和预览环境使用相对路径
-  return '/api';
+  // 生产环境使用完整URL
+  return 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
 }
 
 // 获取请求配置
 function getRequestConfig(): RequestInit {
   const hostname = window.location.hostname;
   
+  // 开发环境和预览环境使用include，生产环境使用omit
+  const isDevOrPreview = hostname === 'localhost' || hostname === '127.0.0.1' || 
+                        hostname.includes('lovableproject.com') || hostname.includes('lovable.app');
+  
   return {
-    credentials: hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com') && !hostname.includes('lovable.app')
-      ? 'omit'  // 生产环境避免跨域cookie问题
-      : 'include' as RequestCredentials  // 开发环境包含cookies
+    credentials: isDevOrPreview ? 'include' as RequestCredentials : 'omit'
   };
 }
 
@@ -35,6 +38,14 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
   
   const config = getRequestConfig();
   
+  
+  console.log('API Request Debug:', {
+    hostname: window.location.hostname,
+    baseUrl,
+    endpoint,
+    url,
+    credentials: config.credentials
+  });
   
   const finalOptions: RequestInit = {
     ...config,
