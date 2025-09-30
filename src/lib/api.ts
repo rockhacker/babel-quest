@@ -10,7 +10,8 @@ function getApiBaseUrl(): string {
   
   // 检查是否在开发环境或预览环境
   if (hostname === 'localhost' || hostname === '127.0.0.1' || 
-      hostname.includes('lovableproject.com') || hostname.includes('lovable.app')) {
+      hostname.includes('lovableproject.com') || hostname.includes('lovable.app') ||
+      hostname.includes('preview--')) {
     return '/api';
   }
   
@@ -24,7 +25,8 @@ function getRequestConfig(): RequestInit {
   
   // 开发环境和预览环境使用include，生产环境使用omit
   const isDevOrPreview = hostname === 'localhost' || hostname === '127.0.0.1' || 
-                        hostname.includes('lovableproject.com') || hostname.includes('lovable.app');
+                        hostname.includes('lovableproject.com') || hostname.includes('lovable.app') ||
+                        hostname.includes('preview--');
   
   return {
     credentials: isDevOrPreview ? 'include' as RequestCredentials : 'omit'
