@@ -20,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Brand {
   id: string;
@@ -41,6 +42,7 @@ interface Replica {
   batch_id: string | null;
   scanned: boolean;
   scanned_at: string | null;
+  created_at: string;
   url: string;
   brands: { name: string };
   types: { name: string };
@@ -105,14 +107,28 @@ const Replicas: React.FC = () => {
     };
   }, [exportPolling, exportJob]);
 
-  // 添加定时刷新副本状态的功能
+  // 实时监听副本状态变化
   useEffect(() => {
-    const interval = setInterval(() => {
-      // 每30秒自动刷新副本数据，以获取最新的扫描状态
-      fetchReplicas(true);
-    }, 30000);
+    const channel = supabase
+      .channel('replicas-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'replicas'
+        },
+        (payload) => {
+          console.log('副本状态变化:', payload);
+          // 当副本状态发生变化时，自动刷新数据
+          fetchReplicas(true);
+        }
+      )
+      .subscribe();
 
-    return () => clearInterval(interval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedBrandId, selectedTypeId, scannedFilter]);
 
   const fetchInitialData = async () => {
@@ -153,10 +169,39 @@ const Replicas: React.FC = () => {
       const response = await fetch(`/api/replicas?${params}`);
       if (response.ok) {
         const data = await response.json();
+        // 对副本进行排序：已扫描的在前面，按扫描时间倒序；未扫描的在后面，按创建时间倒序
+        const sortedItems = data.items.sort((a: Replica, b: Replica) => {
+          // 如果都已扫描或都未扫描，按时间排序
+          if (a.scanned === b.scanned) {
+            if (a.scanned) {
+              // 都已扫描，按扫描时间倒序（最新扫描的在前）
+              return new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime();
+            } else {
+              // 都未扫描，按创建时间倒序（最新创建的在前）
+              return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            }
+          }
+          // 已扫描的在前面
+          return a.scanned ? -1 : 1;
+        });
+        
         if (reset) {
-          setReplicas(data.items);
+          setReplicas(sortedItems);
         } else {
-          setReplicas(prev => [...prev, ...data.items]);
+          setReplicas(prev => {
+            const combined = [...prev, ...sortedItems];
+            // 对合并后的数据重新排序
+            return combined.sort((a: Replica, b: Replica) => {
+              if (a.scanned === b.scanned) {
+                if (a.scanned) {
+                  return new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime();
+                } else {
+                  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+                }
+              }
+              return a.scanned ? -1 : 1;
+            });
+          });
         }
         setNextCursor(data.nextCursor);
       }
