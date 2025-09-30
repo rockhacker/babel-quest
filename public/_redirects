@@ -1,3 +1,8 @@
+# Auth routes should go to Supabase auth function
+/api/login https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/login 200
+/api/logout https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/logout 200
+/api/me https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/auth/me 200
+
 # API routes should go to Supabase edge function
 /api/* https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/:splat 200
 
