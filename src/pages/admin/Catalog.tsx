@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Package, Plus, Tags, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 
 interface Brand {
   id: string;
@@ -37,20 +38,9 @@ const Catalog: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      // 根据环境决定API端点
-      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
-      const brandsUrl = isProduction
-        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands'
-        : '/api/brands';
-      const typesUrl = isProduction
-        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/types'
-        : '/api/types';
-        
-      console.log('Fetching data from:', { brandsUrl, typesUrl });
-        
       const [brandsRes, typesRes] = await Promise.all([
-        fetch(brandsUrl, { credentials: isProduction ? 'omit' : 'include' }),
-        fetch(typesUrl, { credentials: isProduction ? 'omit' : 'include' }),
+        apiRequest('/brands'),
+        apiRequest('/types'),
       ]);
 
       console.log('Fetch responses:', { brands: brandsRes.status, types: typesRes.status });
@@ -90,16 +80,8 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // 根据环境决定API端点
-      const isProduction = window.location.hostname === 'babel-quest.lovable.app';
-      const apiUrl = isProduction
-        ? 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api/brands'
-        : '/api/brands';
-        
-      const response = await fetch(apiUrl, {
+      const response = await apiRequest('/brands', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: isProduction ? 'omit' : 'include',
         body: JSON.stringify({ name: brandName.trim() }),
       });
 
