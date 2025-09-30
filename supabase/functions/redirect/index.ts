@@ -81,28 +81,17 @@ Deno.serve(async (req) => {
       }
       
       console.log('Redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
+      console.log('User-Agent full:', userAgent);
+      console.log('Request headers:', Object.fromEntries(req.headers.entries()));
       
-      // 所有设备都使用简单的HTML重定向页面
-      const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-  <title>跳转中...</title>
-</head>
-<body>
-  <p>正在跳转到目标页面...</p>
-  <p><a href="${redirectUrl}">如果没有自动跳转，请点击这里</a></p>
-  <script>window.location.href="${redirectUrl}";</script>
-</body>
-</html>`;
-      
-      return new Response(htmlContent, {
-        status: 200,
+      // 直接使用HTTP重定向，最简单可靠
+      return new Response(null, {
+        status: 302,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache',
+          'Location': redirectUrl,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
           ...corsHeaders
         }
       });
@@ -138,28 +127,17 @@ Deno.serve(async (req) => {
     }
     
     console.log('First time binding, redirecting to:', redirectUrl, 'Is Mobile:', isMobile);
+    console.log('User-Agent full:', userAgent);
+    console.log('Binding successful, data:', bindingData);
     
-    // 所有设备都使用简单的HTML重定向页面
-    const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-  <title>跳转中...</title>
-</head>
-<body>
-  <p>正在跳转到目标页面...</p>
-  <p><a href="${redirectUrl}">如果没有自动跳转，请点击这里</a></p>
-  <script>window.location.href="${redirectUrl}";</script>
-</body>
-</html>`;
-    
-    return new Response(htmlContent, {
-      status: 200,
+    // 直接使用HTTP重定向，最简单可靠  
+    return new Response(null, {
+      status: 302,
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache',
+        'Location': redirectUrl,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache', 
+        'Expires': '0',
         ...corsHeaders
       }
     });
