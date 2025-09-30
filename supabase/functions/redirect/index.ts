@@ -76,9 +76,10 @@ Deno.serve(async (req) => {
         redirectUrl = 'https://' + redirectUrl;
       }
       
+      
       console.log('Redirecting to:', redirectUrl);
-      // 执行302跳转，支持最多3次跟随
-      return await followRedirects(redirectUrl, 3);
+      // 直接执行302重定向，不跟随后续重定向
+      return Response.redirect(redirectUrl, 302);
     }
 
     // 未绑定，开始事务绑定流程
@@ -110,9 +111,10 @@ Deno.serve(async (req) => {
       redirectUrl = 'https://' + redirectUrl;
     }
     
+    
     console.log('First time binding, redirecting to:', redirectUrl);
-    // 执行302跳转
-    return await followRedirects(redirectUrl, 3);
+    // 直接执行302重定向，不跟随后续重定向
+    return Response.redirect(redirectUrl, 302);
 
   } catch (error) {
     console.error('Redirect error:', error);
