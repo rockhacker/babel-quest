@@ -37,10 +37,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await response.json();
         if (data.ok) {
           setUser(data.user);
+        } else {
+          setUser(null);
+          localStorage.removeItem('sessionId'); // 清除无效的sessionId
         }
+      } else {
+        setUser(null);
+        localStorage.removeItem('sessionId'); // 清除无效的sessionId
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      setUser(null);
+      localStorage.removeItem('sessionId'); // 清除无效的sessionId
     } finally {
       setLoading(false);
     }
@@ -56,7 +64,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await response.json();
       
       if (data.ok) {
-        setUser({ username });
+        // 如果Safari或移动端无法使用cookie，使用localStorage存储sessionId
+        if (data.sessionId) {
+          localStorage.setItem('sessionId', data.sessionId);
+        }
+        setUser(data.user || { username });
         return { success: true };
       } else {
         return { success: false, error: data.msg || '登录失败' };
@@ -69,8 +81,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await apiRequest('/logout', { method: 'POST' });
+      localStorage.removeItem('sessionId'); // 清除localStorage中的sessionId
     } catch (error) {
       console.error('Logout failed:', error);
+      localStorage.removeItem('sessionId'); // 即使请求失败也清除本地存储
     } finally {
       setUser(null);
     }

@@ -96,29 +96,26 @@ Deno.serve(async (req) => {
             );
           }
 
-          // 设置cookie - 兼容Safari和移动端
+          // 同时支持cookie和Authorization头部
           const origin = req.headers.get('origin');
           const userAgent = req.headers.get('user-agent') || '';
           const isSecure = origin?.startsWith('https://');
           const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
           
-          // 根据浏览器和环境设置不同的cookie策略
+          // 设置cookie（用于Chrome等浏览器）
           let cookieValue;
-          if (isSecure) {
-            if (isSafari) {
-              // Safari：使用SameSite=Lax，不使用Secure
-              cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`;
-            } else {
-              // 其他浏览器：使用SameSite=None; Secure以支持跨域
-              cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`;
-            }
+          if (isSecure && !isSafari) {
+            cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`;
           } else {
-            // HTTP环境：使用SameSite=Lax（开发环境）
             cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`;
           }
           
           const response = new Response(
-            JSON.stringify({ ok: true }),
+            JSON.stringify({ 
+              ok: true, 
+              sessionId: sessionId, // 为Safari提供sessionId，供前端存储到localStorage
+              user: { username }
+            }),
             { 
               headers: { 
                 ...corsHeaders, 

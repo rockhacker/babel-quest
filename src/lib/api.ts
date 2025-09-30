@@ -61,6 +61,15 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}): P
     },
   };
 
+  // 如果localStorage中有sessionId，添加到Authorization头部（用于Safari等不支持跨域cookie的浏览器）
+  const sessionId = localStorage.getItem('sessionId');
+  if (sessionId) {
+    finalOptions.headers = {
+      ...finalOptions.headers,
+      'Authorization': `Bearer ${sessionId}`
+    };
+  }
+
   return fetch(url, finalOptions);
 }
 

@@ -166,10 +166,19 @@ async function verifySession(req: Request) {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
+  // 先尝试从cookie获取sessionId
   const cookies = req.headers.get('cookie');
-  const sessionId = cookies?.split(';')
+  let sessionId = cookies?.split(';')
     .find(c => c.trim().startsWith('sid='))
     ?.split('=')[1];
+
+  // 如果cookie中没有，尝试从Authorization头部获取（用于Safari等浏览器）
+  if (!sessionId) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      sessionId = authHeader.substring(7);
+    }
+  }
 
   if (!sessionId) {
     return null;
