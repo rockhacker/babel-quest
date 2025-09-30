@@ -16,7 +16,8 @@ import {
   CheckCircle,
   Clock,
   AlertTriangle,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -103,6 +104,16 @@ const Replicas: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [exportPolling, exportJob]);
+
+  // 添加定时刷新副本状态的功能
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 每30秒自动刷新副本数据，以获取最新的扫描状态
+      fetchReplicas(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [selectedBrandId, selectedTypeId, scannedFilter]);
 
   const fetchInitialData = async () => {
     try {
@@ -615,15 +626,27 @@ const Replicas: React.FC = () => {
               </Label>
             </div>
             
-            <Button
-              variant="destructive"
-              onClick={handleBulkDelete}
-              disabled={submitting || !selectedBrandId || !selectedTypeId}
-              className="w-full"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              批量删除当前筛选结果
-            </Button>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => fetchReplicas(true)}
+                disabled={submitting}
+                className="flex-1"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                刷新数据
+              </Button>
+              
+              <Button
+                variant="destructive"
+                onClick={handleBulkDelete}
+                disabled={submitting || !selectedBrandId || !selectedTypeId}
+                className="flex-1"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                批量删除当前筛选结果
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
