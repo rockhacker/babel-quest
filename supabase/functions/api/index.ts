@@ -209,6 +209,16 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(p => p);
   const endpoint = pathParts[pathParts.length - 1];
+  
+  // 对于DELETE请求，如果路径是 /api/brands/{id} 或 /api/types/{id}
+  // 需要正确识别endpoint为'brands'或'types'而不是ID
+  let actualEndpoint = endpoint;
+  if (req.method === 'DELETE' && pathParts.length >= 2) {
+    const secondLast = pathParts[pathParts.length - 2];
+    if (secondLast === 'brands' || secondLast === 'types') {
+      actualEndpoint = secondLast;
+    }
+  }
 
   try {
     // 验证session
@@ -491,7 +501,7 @@ Deno.serve(async (req) => {
         break;
 
       case 'DELETE':
-        if (endpoint === 'brands') {
+        if (actualEndpoint === 'brands') {
           const brandId = pathParts[pathParts.length - 1];
           
           if (!brandId) {
@@ -543,7 +553,7 @@ Deno.serve(async (req) => {
           );
         }
 
-        if (endpoint === 'types') {
+        if (actualEndpoint === 'types') {
           const typeId = pathParts[pathParts.length - 1];
           
           if (!typeId) {
