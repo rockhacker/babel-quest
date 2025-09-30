@@ -9,7 +9,7 @@ function getApiBaseUrl(): string {
   const hostname = window.location.hostname;
   
   // 检查是否在生产环境（非localhost和非预览域名）
-  if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com')) {
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com') && !hostname.includes('lovable.app')) {
     return 'https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/api';
   }
   
@@ -22,7 +22,7 @@ function getRequestConfig(): RequestInit {
   const hostname = window.location.hostname;
   
   return {
-    credentials: hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com') 
+    credentials: hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('lovableproject.com') && !hostname.includes('lovable.app')
       ? 'omit'  // 生产环境避免跨域cookie问题
       : 'include' as RequestCredentials  // 开发环境包含cookies
   };
