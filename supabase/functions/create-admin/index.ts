@@ -1,6 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     // 使用service role key创建admin client
     const supabaseAdmin = createClient(
@@ -16,6 +26,8 @@ Deno.serve(async (req) => {
 
     const { email, password } = await req.json();
 
+    console.log('Creating admin user:', email);
+
     // 使用Supabase Admin API创建用户
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
@@ -30,10 +42,12 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: authError.message }),
         { 
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
+
+    console.log('User created successfully:', authData.user.id);
 
     // 分配管理员角色
     const { error: roleError } = await supabaseAdmin
@@ -51,10 +65,12 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: false, error: roleError.message }),
         { 
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
+
+    console.log('Admin role assigned successfully');
 
     return new Response(
       JSON.stringify({ 
@@ -65,7 +81,7 @@ Deno.serve(async (req) => {
         }
       }),
       { 
-        headers: { 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
 
@@ -76,7 +92,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ ok: false, error: errorMessage }),
       { 
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
