@@ -29,7 +29,7 @@ enable_confirmations = false
 secure_password_change = false
 
 [functions.api]
-verify_jwt = false
+verify_jwt = true
 
 [functions.auth]
 verify_jwt = false
