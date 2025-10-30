@@ -111,13 +111,11 @@ export type Database = {
           file_path: string | null
           finished_at: string | null
           id: string
-          signed_url: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["export_status"] | null
           total: number | null
           type_id: string | null
           updated_at: string | null
-          url_expires_at: string | null
         }
         Insert: {
           base_url?: string | null
@@ -128,13 +126,11 @@ export type Database = {
           file_path?: string | null
           finished_at?: string | null
           id?: string
-          signed_url?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["export_status"] | null
           total?: number | null
           type_id?: string | null
           updated_at?: string | null
-          url_expires_at?: string | null
         }
         Update: {
           base_url?: string | null
@@ -145,13 +141,11 @@ export type Database = {
           file_path?: string | null
           finished_at?: string | null
           id?: string
-          signed_url?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["export_status"] | null
           total?: number | null
           type_id?: string | null
           updated_at?: string | null
-          url_expires_at?: string | null
         }
         Relationships: [
           {
@@ -321,27 +315,6 @@ export type Database = {
           },
         ]
       }
-      user_roles: {
-        Row: {
-          created_at: string | null
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -354,16 +327,8 @@ export type Database = {
           original_url: string
         }[]
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
     }
     Enums: {
-      app_role: "admin" | "user"
       export_status: "pending" | "processing" | "finished" | "failed"
     }
     CompositeTypes: {
@@ -492,7 +457,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
       export_status: ["pending", "processing", "finished", "failed"],
     },
   },

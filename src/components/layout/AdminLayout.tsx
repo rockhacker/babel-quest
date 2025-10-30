@@ -108,10 +108,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <div className="flex items-center space-x-3">
                 <div className="h-8 w-8 rounded-full bg-sidebar-primary flex items-center justify-center">
                   <span className="text-sm font-medium text-sidebar-primary-foreground">
-                    {user.email?.charAt(0).toUpperCase()}
+                    {user.username.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <span className="text-sm text-sidebar-foreground">{user.email}</span>
+                <span className="text-sm text-sidebar-foreground">{user.username}</span>
               </div>
               <Button
                 variant="ghost"

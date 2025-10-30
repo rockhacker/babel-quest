@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { QrCode, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { user, login } = useAuth();
@@ -25,10 +25,10 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!username || !password) {
       toast({
         title: "输入错误",
-        description: "请输入邮箱和密码",
+        description: "请输入用户名和密码",
         variant: "destructive",
       });
       return;
@@ -37,20 +37,20 @@ const Login: React.FC = () => {
     setLoading(true);
     
     try {
-      const { error } = await login(email, password);
+      const result = await login(username, password);
       
-      if (error) {
-        toast({
-          title: "登录失败",
-          description: error.message || "邮箱或密码错误",
-          variant: "destructive",
-        });
-      } else {
+      if (result.success) {
         toast({
           title: "登录成功",
           description: "欢迎回来！",
         });
         navigate('/admin');
+      } else {
+        toast({
+          title: "登录失败",
+          description: result.error || "用户名或密码错误",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({
@@ -75,20 +75,19 @@ const Login: React.FC = () => {
               </div>
             </div>
             <CardTitle className="text-xl text-foreground">管理员登录</CardTitle>
-            <CardDescription>请输入您的邮箱和密码以访问系统</CardDescription>
           </CardHeader>
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">邮箱</Label>
+                <Label htmlFor="username" className="text-foreground">用户名</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                  placeholder="admin@example.com"
+                  placeholder="请输入用户名"
                   disabled={loading}
                 />
               </div>
@@ -127,7 +126,7 @@ const Login: React.FC = () => {
             
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                请使用 Supabase Auth 创建的管理员账号登录
+                默认账号: admin / admin123
               </p>
             </div>
           </CardContent>

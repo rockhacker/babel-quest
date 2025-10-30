@@ -1,11 +1,13 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { User, Session } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { apiRequest } from '@/lib/api';
+
+interface AuthUser {
+  username: string;
+}
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  login: (email: string, password: string) => Promise<{ error: Error | null }>;
+  user: AuthUser | null;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   loading: boolean;
 }
@@ -20,62 +22,80 @@ export const useAuth = () => {
   return context;
 };
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const checkAuth = async () => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) {
-        return { error };
+      const response = await apiRequest('/me');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.ok) {
+          setUser(data.user);
+        } else {
+          setUser(null);
+          localStorage.removeItem('sessionId'); // 清除无效的sessionId
+        }
+      } else {
+        setUser(null);
+        localStorage.removeItem('sessionId'); // 清除无效的sessionId
       }
-      
-      return { error: null };
     } catch (error) {
-      console.error('Login error:', error);
-      return { error: error as Error };
+      console.error('Auth check failed:', error);
+      setUser(null);
+      localStorage.removeItem('sessionId'); // 清除无效的sessionId
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (username: string, password: string) => {
+    try {
+      const response = await apiRequest('/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+      
+      if (data.ok) {
+        // 如果Safari或移动端无法使用cookie，使用localStorage存储sessionId
+        if (data.sessionId) {
+          localStorage.setItem('sessionId', data.sessionId);
+        }
+        setUser(data.user || { username });
+        return { success: true };
+      } else {
+        return { success: false, error: data.msg || '登录失败' };
+      }
+    } catch (error) {
+      return { success: false, error: '网络错误' };
     }
   };
 
   const logout = async () => {
     try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
+      await apiRequest('/logout', { method: 'POST' });
+      localStorage.removeItem('sessionId'); // 清除localStorage中的sessionId
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout failed:', error);
+      localStorage.removeItem('sessionId'); // 即使请求失败也清除本地存储
+    } finally {
+      setUser(null);
     }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, session, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+  const value = {
+    user,
+    login,
+    logout,
+    loading,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

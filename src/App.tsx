@@ -12,7 +12,6 @@ import Inventory from "@/pages/admin/Inventory";
 import Replicas from "@/pages/admin/Replicas";
 import Redirect from "@/pages/Redirect";
 import NotFound from "@/pages/NotFound";
-import CreateAdmin from "@/pages/CreateAdmin";
 
 const queryClient = new QueryClient();
 
@@ -25,7 +24,6 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Navigate to="/admin" replace />} />
-            <Route path="/create-admin" element={<CreateAdmin />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={
               <AdminLayout>

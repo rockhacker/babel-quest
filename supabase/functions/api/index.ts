@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 // 动态获取CORS headers
 function getCorsHeaders(req: Request) {
@@ -19,68 +18,6 @@ function getCorsHeaders(req: Request) {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Credentials': 'true',
   };
-}
-
-// Input validation schemas
-const brandSchema = z.object({
-  name: z.string()
-    .trim()
-    .min(1, 'Brand name cannot be empty')
-    .max(100, 'Brand name too long')
-    .regex(/^[a-zA-Z0-9\s\-_一-龥]+$/, 'Invalid characters in brand name')
-});
-
-const typeSchema = z.object({
-  brand_id: z.string().uuid('Invalid brand ID'),
-  name: z.string()
-    .trim()
-    .min(1, 'Type name cannot be empty')
-    .max(100, 'Type name too long')
-});
-
-const originalSchema = z.object({
-  brand_id: z.string().uuid('Invalid brand ID'),
-  type_id: z.string().uuid('Invalid type ID'),
-  url: z.string()
-    .url('Invalid URL format')
-    .max(2048, 'URL too long')
-});
-
-const replicaGenerateSchema = z.object({
-  brandId: z.string().uuid('Invalid brand ID'),
-  typeId: z.string().uuid('Invalid type ID'),
-  count: z.number()
-    .int('Count must be an integer')
-    .min(1, 'Count must be at least 1')
-    .max(10000, 'Count cannot exceed 10,000')
-});
-
-// Helper function to validate input
-function validateInput<T>(schema: z.ZodSchema<T>, data: any, corsHeaders: HeadersInit): { valid: true; data: T } | { valid: false; response: Response } {
-  try {
-    const validated = schema.parse(data);
-    return { valid: true, data: validated };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return {
-        valid: false,
-        response: new Response(
-          JSON.stringify({ 
-            ok: false, 
-            errors: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      };
-    }
-    return {
-      valid: false,
-      response: new Response(
-        JSON.stringify({ ok: false, error: 'Invalid input' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    };
-  }
 }
 
 // 导出任务处理函数
@@ -191,21 +128,18 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
       throw uploadError;
     }
 
-    // Generate signed URL (1 hour expiration)
-    const { data: signedUrlData } = await supabase.storage
+    // 获取文件的公共URL
+    const { data: urlData } = supabase.storage
       .from('exports')
-      .createSignedUrl(fileName, 3600);
+      .getPublicUrl(fileName);
 
-    // Update job as completed with signed URL
     await supabase
       .from('export_jobs')
       .update({ 
         status: 'finished',
-        file_path: fileName,
-        signed_url: signedUrlData?.signedUrl || null,
-        url_expires_at: new Date(Date.now() + 3600000).toISOString(),
         completed: total,
-        finished_at: new Date().toISOString()
+        finished_at: new Date().toISOString(),
+        file_path: urlData.publicUrl
       })
       .eq('id', jobId);
 
@@ -225,6 +159,41 @@ async function processExportJob(jobId: string, brandId: string | null, typeId: s
   }
 }
 
+// 验证管理员session
+async function verifySession(req: Request) {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  // 先尝试从cookie获取sessionId
+  const cookies = req.headers.get('cookie');
+  let sessionId = cookies?.split(';')
+    .find(c => c.trim().startsWith('sid='))
+    ?.split('=')[1];
+
+  // 如果cookie中没有，尝试从Authorization头部获取（用于Safari等浏览器）
+  if (!sessionId) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      sessionId = authHeader.substring(7);
+    }
+  }
+
+  if (!sessionId) {
+    return null;
+  }
+
+  const { data: session, error } = await supabase
+    .from('admin_sessions')
+    .select('*')
+    .eq('session_id', sessionId)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  return error || !session ? null : session;
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -232,16 +201,10 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Initialize Supabase client with auth from request
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-  const authHeader = req.headers.get('Authorization');
-  
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    global: {
-      headers: authHeader ? { Authorization: authHeader } : {},
-    },
-  });
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
 
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(p => p);
@@ -258,287 +221,331 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify authentication using Supabase Auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      console.error('Authentication failed:', authError);
+    // 验证session
+    const session = await verifySession(req);
+    if (!session) {
       return new Response(
-        JSON.stringify({ ok: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define stats endpoint
-    if (endpoint === 'stats') {
-      // 获取统计数据
-      const [brandsRes, typesRes, originalsRes, originalsFreeRes, replicasRes, replicasScannedRes] = await Promise.all([
-        supabase.from('brands').select('*', { count: 'exact', head: true }),
-        supabase.from('types').select('*', { count: 'exact', head: true }),
-        supabase.from('originals').select('*', { count: 'exact', head: true }),
-        supabase.from('originals').select('*', { count: 'exact', head: true }).eq('scanned', false),
-        supabase.from('replicas').select('*', { count: 'exact', head: true }),
-        supabase.from('replicas').select('*', { count: 'exact', head: true }).eq('scanned', true),
-      ]);
-
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          stats: {
-            brands: brandsRes.count || 0,
-            types: typesRes.count || 0,
-            originals: originalsRes.count || 0,
-            originalsFree: originalsFreeRes.count || 0,
-            replicas: replicasRes.count || 0,
-            replicasScanned: replicasScannedRes.count || 0,
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define brands endpoint
-    if (endpoint === 'brands') {
-      const { data, error } = await supabase
-        .from('brands')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      return new Response(
-        JSON.stringify({ ok: true, data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define types endpoint
-    if (endpoint === 'types') {
-      const brandId = url.searchParams.get('brandId');
-      let query = supabase.from('types').select('*');
-      
-      if (brandId && brandId !== 'all') {
-        query = query.eq('brand_id', brandId);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      return new Response(
-        JSON.stringify({ ok: true, data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define originals endpoint
-    if (endpoint === 'originals') {
-      const brandId = url.searchParams.get('brandId');
-      const typeId = url.searchParams.get('typeId');
-      const sortBy = url.searchParams.get('sortBy') || 'newest';
-      const pageSize = parseInt(url.searchParams.get('pageSize') || '20');
-      const cursor = url.searchParams.get('cursor');
-      const page = parseInt(url.searchParams.get('page') || '1');
-      const useCursor = url.searchParams.get('useCursor') === 'true';
-
-      let query = supabase
-        .from('originals')
-        .select('*');
-
-      if (brandId && brandId !== 'all') {
-        query = query.eq('brand_id', brandId);
-      }
-      if (typeId && typeId !== 'all') {
-        query = query.eq('type_id', typeId);
-      }
-
-      const sortField = sortBy === 'newest' ? 'created_at' : 'scanned_at';
-      const ascending = sortBy === 'oldest';
-      
-      if (useCursor && cursor) {
-        query = query.lt('created_at', cursor);
-      }
-
-      if (!useCursor && page > 1) {
-        const offset = (page - 1) * pageSize;
-        query = query.range(offset, offset + pageSize - 1);
-      } else {
-        query = query.limit(pageSize);
-      }
-
-      query = query.order(sortField, { ascending });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      return new Response(
-        JSON.stringify({ 
-          ok: true, 
-          data,
-          hasMore: data && data.length === pageSize,
-          nextCursor: data && data.length > 0 ? data[data.length - 1].created_at : null
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define count originals endpoint
-    if (pathParts.includes('count') && pathParts.includes('originals')) {
-      const brandId = url.searchParams.get('brandId');
-      const typeId = url.searchParams.get('typeId');
-
-      let query = supabase.from('originals').select('*', { count: 'exact', head: true });
-
-      if (brandId && brandId !== 'all') {
-        query = query.eq('brand_id', brandId);
-      }
-      if (typeId && typeId !== 'all') {
-        query = query.eq('type_id', typeId);
-      }
-
-      const { count, error } = await query;
-
-      if (error) throw error;
-
-      return new Response(
-        JSON.stringify({ ok: true, count: count || 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define replicas endpoint
-    if (endpoint === 'replicas') {
-      const brandId = url.searchParams.get('brandId');
-      const typeId = url.searchParams.get('typeId');
-      const scannedStatus = url.searchParams.get('scannedStatus');
-      const sortBy = url.searchParams.get('sortBy') || 'newest';
-      const pageSize = parseInt(url.searchParams.get('pageSize') || '20');
-      const cursor = url.searchParams.get('cursor');
-      const page = parseInt(url.searchParams.get('page') || '1');
-      const useCursor = url.searchParams.get('useCursor') === 'true';
-
-      let query = supabase
-        .from('replicas')
-        .select('*, brands(name), types(name)');
-
-      if (brandId && brandId !== 'all') {
-        query = query.eq('brand_id', brandId);
-      }
-      if (typeId && typeId !== 'all') {
-        query = query.eq('type_id', typeId);
-      }
-      if (scannedStatus && scannedStatus !== 'all') {
-        query = query.eq('scanned', scannedStatus === 'true');
-      }
-
-      const sortField = sortBy === 'newest' ? 'created_at' : 'scanned_at';
-      const ascending = sortBy === 'oldest';
-      
-      if (useCursor && cursor) {
-        query = query.lt('created_at', cursor);
-      }
-
-      if (!useCursor && page > 1) {
-        const offset = (page - 1) * pageSize;
-        query = query.range(offset, offset + pageSize - 1);
-      } else {
-        query = query.limit(pageSize);
-      }
-
-      query = query.order(sortField, { ascending });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const transformedData = data?.map(replica => ({
-        ...replica,
-        url: `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${replica.token}`,
-        brandName: replica.brands?.name || '',
-        typeName: replica.types?.name || ''
-      }));
-
-      return new Response(
-        JSON.stringify({ 
-          ok: true, 
-          data: transformedData,
-          hasMore: data && data.length === pageSize,
-          nextCursor: data && data.length > 0 ? data[data.length - 1].created_at : null
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Define replica_export_jobs endpoint
-    if (pathParts.includes('replica_export_jobs')) {
-      const jobId = pathParts[pathParts.length - 1];
-      
-      if (jobId && jobId !== 'replica_export_jobs') {
-        // If a specific export job is requested, get it
-        const { data: job, error: jobError } = await supabase
-          .from('export_jobs')
-          .select('*')
-          .eq('id', jobId)
-          .single();
-
-        if (jobError) {
-          return new Response(
-            JSON.stringify({ ok: false, error: jobError.message }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        JSON.stringify({ ok: false, msg: '未授权' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-
-        // Regenerate signed URL if expired
-        if (job.file_path && (!job.url_expires_at || new Date(job.url_expires_at) < new Date())) {
-          const { data: signedUrlData } = await supabase.storage
-            .from('exports')
-            .createSignedUrl(job.file_path, 3600);
-
-          if (signedUrlData?.signedUrl) {
-            job.signed_url = signedUrlData.signedUrl;
-            job.url_expires_at = new Date(Date.now() + 3600000).toISOString();
-
-            // Update in database
-            await supabase
-              .from('export_jobs')
-              .update({
-                signed_url: job.signed_url,
-                url_expires_at: job.url_expires_at
-              })
-              .eq('id', jobId);
-          }
-        }
-
-        return new Response(
-          JSON.stringify({ ok: true, job }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      );
     }
 
     switch (req.method) {
       case 'GET':
-        
+        if (endpoint === 'stats') {
+          // 获取统计数据
+          const [brandsRes, typesRes, originalsRes, originalsFreeRes, replicasRes, replicasScannedRes] = await Promise.all([
+            supabase.from('brands').select('*', { count: 'exact', head: true }),
+            supabase.from('types').select('*', { count: 'exact', head: true }),
+            supabase.from('originals').select('*', { count: 'exact', head: true }),
+            supabase.from('originals').select('*', { count: 'exact', head: true }).eq('scanned', false),
+            supabase.from('replicas').select('*', { count: 'exact', head: true }),
+            supabase.from('replicas').select('*', { count: 'exact', head: true }).eq('scanned', true),
+          ]);
+
+          return new Response(
+            JSON.stringify({
+              brands: brandsRes.count || 0,
+              types: typesRes.count || 0,
+              originals: originalsRes.count || 0,
+              originalsFree: originalsFreeRes.count || 0,
+              replicas: replicasRes.count || 0,
+              replicasScanned: replicasScannedRes.count || 0,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'brands') {
+          const { data, error } = await supabase
+            .from('brands')
+            .select('*')
+            .order('name');
+
+          if (error) throw error;
+
+          return new Response(
+            JSON.stringify(data),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'types') {
+          const brandId = url.searchParams.get('brandId');
+          let query = supabase.from('types').select(`
+            *,
+            brands (name)
+          `);
+
+          if (brandId) {
+            query = query.eq('brand_id', brandId);
+          }
+
+          const { data, error } = await query.order('name');
+          if (error) throw error;
+
+          return new Response(
+            JSON.stringify(data),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'originals') {
+          const brandId = url.searchParams.get('brandId');
+          const typeId = url.searchParams.get('typeId');
+          const scanned = url.searchParams.get('scanned');
+          const cursor = url.searchParams.get('cursor');
+          const page = parseInt(url.searchParams.get('page') || '1');
+          const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
+
+          let query = supabase.from('originals').select(`
+            *,
+            brands (name),
+            types (name)
+          `);
+
+          if (brandId && brandId !== 'all') query = query.eq('brand_id', brandId);
+          if (typeId && typeId !== 'all') query = query.eq('type_id', typeId);
+          if (scanned === '0') query = query.eq('scanned', false);
+          if (scanned === '1') query = query.eq('scanned', true);
+
+          // 支持两种分页方式：cursor分页（原有方式）和页码分页（新增）
+          if (cursor) {
+            query = query.lt('id', cursor);
+          } else if (page > 1) {
+            const offset = (page - 1) * limit;
+            query = query.range(offset, offset + limit - 1);
+          } else {
+            query = query.limit(limit);
+          }
+
+          // 获取总数用于页码分页
+          let totalCount = 0;
+          if (!cursor && page) {
+            let countQuery = supabase.from('originals').select('*', { count: 'exact', head: true });
+            if (brandId && brandId !== 'all') countQuery = countQuery.eq('brand_id', brandId);
+            if (typeId && typeId !== 'all') countQuery = countQuery.eq('type_id', typeId);
+            if (scanned === '0') countQuery = countQuery.eq('scanned', false);
+            if (scanned === '1') countQuery = countQuery.eq('scanned', true);
+            
+            const { count } = await countQuery;
+            totalCount = count || 0;
+          }
+
+          const { data, error } = await query
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          const items = data.map(item => ({
+            ...item,
+            rid: item.id.substring(0, 8)
+          }));
+
+          const nextCursor = cursor && items.length === limit ? items[items.length - 1].id : null;
+          const totalPages = Math.ceil(totalCount / limit);
+          const hasMore = page < totalPages;
+
+          return new Response(
+            JSON.stringify({ 
+              items, 
+              nextCursor,
+              totalPages,
+              currentPage: page,
+              hasMore,
+              total: totalCount
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'count' && pathParts.includes('originals')) {
+          const brandId = url.searchParams.get('brandId');
+          const typeId = url.searchParams.get('typeId');
+          const scanned = url.searchParams.get('scanned');
+
+          let query = supabase.from('originals').select('*', { count: 'exact', head: true });
+
+          if (brandId) query = query.eq('brand_id', brandId);
+          if (typeId) query = query.eq('type_id', typeId);
+          if (scanned === '0') query = query.eq('scanned', false);
+          if (scanned === '1') query = query.eq('scanned', true);
+
+          const { count, error } = await query;
+          if (error) throw error;
+
+          return new Response(
+            JSON.stringify({ count: count || 0 }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (endpoint === 'replicas') {
+          const brandId = url.searchParams.get('brandId');
+          const typeId = url.searchParams.get('typeId');
+          const batchId = url.searchParams.get('batchId');
+          const scanned = url.searchParams.get('scanned');
+          const cursor = url.searchParams.get('cursor');
+          const page = parseInt(url.searchParams.get('page') || '1');
+          const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
+
+          // 从请求头获取前端域名
+          const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/[^\/]*$/, '') || 'https://727de735-cc70-42ed-a3f9-80607a44faa1.lovableproject.com';
+
+          let query = supabase.from('replicas').select(`
+            *,
+            brands (name),
+            types (name)
+          `);
+
+          if (brandId && brandId !== 'all') query = query.eq('brand_id', brandId);
+          if (typeId && typeId !== 'all') query = query.eq('type_id', typeId);
+          if (batchId) query = query.eq('batch_id', batchId);
+          if (scanned === '0') query = query.eq('scanned', false);
+          if (scanned === '1') query = query.eq('scanned', true);
+
+          // 支持两种分页方式：cursor分页（原有方式）和页码分页（新增）
+          if (cursor) {
+            query = query.lt('id', cursor);
+          } else if (page > 1) {
+            const offset = (page - 1) * limit;
+            query = query.range(offset, offset + limit - 1);
+          } else {
+            query = query.limit(limit);
+          }
+
+          // 获取总数用于页码分页
+          let totalCount = 0;
+          if (!cursor && page) {
+            let countQuery = supabase.from('replicas').select('*', { count: 'exact', head: true });
+            if (brandId && brandId !== 'all') countQuery = countQuery.eq('brand_id', brandId);
+            if (typeId && typeId !== 'all') countQuery = countQuery.eq('type_id', typeId);
+            if (batchId) countQuery = countQuery.eq('batch_id', batchId);
+            if (scanned === '0') countQuery = countQuery.eq('scanned', false);
+            if (scanned === '1') countQuery = countQuery.eq('scanned', true);
+            
+            const { count } = await countQuery;
+            totalCount = count || 0;
+          }
+
+          const { data, error } = await query
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          const items = data.map(item => ({
+            ...item,
+            rid: item.id,
+            url: `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${item.token}`
+          }));
+
+          const nextCursor = cursor && items.length === limit ? items[items.length - 1].id : null;
+          const totalPages = Math.ceil(totalCount / limit);
+          const hasMore = page < totalPages;
+
+          return new Response(
+            JSON.stringify({ 
+              items, 
+              nextCursor,
+              totalPages,
+              currentPage: page,
+              hasMore,
+              total: totalCount
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 查询导出任务状态
+        if (pathParts.includes('replica_export_jobs') && pathParts.length > 2) {
+          const jobId = pathParts[pathParts.length - 1];
+          
+          const { data: job, error: jobError } = await supabase
+            .from('export_jobs')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+
+          if (jobError || !job) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '任务未找到' }),
+              { 
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          const progress = job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;
+
+          return new Response(
+            JSON.stringify({ 
+              ok: true,
+              status: job.status,
+              total: job.total,
+              completed: job.completed,
+              progress: progress,
+              downloadUrl: job.file_path,
+              error: job.error_message,
+              startedAt: job.started_at,
+              finishedAt: job.finished_at
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+
         break;
 
       case 'DELETE':
         if (actualEndpoint === 'brands') {
-          const id = pathParts[pathParts.length - 1];
+          const brandId = pathParts[pathParts.length - 1];
           
-          const { count: typeCount } = await supabase
-            .from('types')
-            .select('*', { count: 'exact', head: true })
-            .eq('brand_id', id);
-
-          if (typeCount && typeCount > 0) {
+          if (!brandId) {
             return new Response(
-              JSON.stringify({ ok: false, msg: '该品牌下还有类型，请先删除相关类型' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              JSON.stringify({ ok: false, msg: '品牌ID不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
             );
           }
 
-          await supabase.from('brands').delete().eq('id', id);
+          // 检查是否有关联的类型
+          const { data: types, error: typesError } = await supabase
+            .from('types')
+            .select('id')
+            .eq('brand_id', brandId)
+            .limit(1);
+
+          if (typesError) {
+            console.error('检查类型时出错:', typesError);
+            throw typesError;
+          }
+
+          if (types && types.length > 0) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '无法删除品牌：该品牌下还有类型，请先删除所有类型' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 删除品牌
+          const { error: deleteError } = await supabase
+            .from('brands')
+            .delete()
+            .eq('id', brandId);
+
+          if (deleteError) {
+            console.error('删除品牌时出错:', deleteError);
+            throw deleteError;
+          }
 
           return new Response(
             JSON.stringify({ ok: true }),
@@ -547,152 +554,270 @@ Deno.serve(async (req) => {
         }
 
         if (actualEndpoint === 'types') {
-          const id = pathParts[pathParts.length - 1];
+          const typeId = pathParts[pathParts.length - 1];
           
-          const [replicasResult, originalsResult] = await Promise.all([
-            supabase.from('replicas').select('*', { count: 'exact', head: true }).eq('type_id', id),
-            supabase.from('originals').select('*', { count: 'exact', head: true }).eq('type_id', id)
-          ]);
-
-          if ((replicasResult.count || 0) > 0 || (originalsResult.count || 0) > 0) {
+          if (!typeId) {
             return new Response(
-              JSON.stringify({ ok: false, msg: '该类型下还有原始码或副本码，请先删除相关数据' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              JSON.stringify({ ok: false, msg: '类型ID不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
             );
           }
 
-          await supabase.from('types').delete().eq('id', id);
+          // 检查是否有关联的副本或原始码
+          const [replicasRes, originalsRes] = await Promise.all([
+            supabase.from('replicas').select('id').eq('type_id', typeId).limit(1),
+            supabase.from('originals').select('id').eq('type_id', typeId).limit(1)
+          ]);
+
+          if (replicasRes.error) {
+            console.error('检查副本时出错:', replicasRes.error);
+            throw replicasRes.error;
+          }
+          
+          if (originalsRes.error) {
+            console.error('检查原始码时出错:', originalsRes.error);
+            throw originalsRes.error;
+          }
+
+          if ((replicasRes.data && replicasRes.data.length > 0) || (originalsRes.data && originalsRes.data.length > 0)) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '无法删除类型：该类型下还有副本或原始码数据' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 删除类型
+          const { error: deleteError } = await supabase
+            .from('types')
+            .delete()
+            .eq('id', typeId);
+
+          if (deleteError) {
+            console.error('删除类型时出错:', deleteError);
+            throw deleteError;
+          }
 
           return new Response(
             JSON.stringify({ ok: true }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
+
         break;
 
       case 'POST':
         if (endpoint === 'brands') {
-          // POST /brands - Create a new brand
-          const body = await req.json();
-          const validation = validateInput(brandSchema, body, corsHeaders);
-          if (!validation.valid) return validation.response;
-          const { name } = validation.data;
+          const { name } = await req.json();
+          
+          if (!name) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '品牌名称不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
 
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from('brands')
-            .insert({ name })
-            .select()
-            .single();
+            .insert({ name });
 
-          if (error) throw error;
+          if (error) {
+            if (error.code === '23505') { // unique constraint violation
+              return new Response(
+                JSON.stringify({ ok: false, msg: '品牌已存在' }),
+                { 
+                  status: 400,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                }
+              );
+            }
+            throw error;
+          }
 
           return new Response(
-            JSON.stringify({ ok: true, data }),
+            JSON.stringify({ ok: true }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         if (endpoint === 'types') {
-          // POST /types - Create a new type
-          const body = await req.json();
-          const validation = validateInput(typeSchema, body, corsHeaders);
-          if (!validation.valid) return validation.response;
-          const { brand_id, name } = validation.data;
+          const { brandId, name } = await req.json();
+          
+          if (!brandId || !name) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '品牌ID和类型名称不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
 
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from('types')
-            .insert({ brand_id, name })
-            .select()
-            .single();
+            .insert({ brand_id: brandId, name });
 
-          if (error) throw error;
+          if (error) {
+            if (error.code === '23505') {
+              return new Response(
+                JSON.stringify({ ok: false, msg: '类型已存在' }),
+                { 
+                  status: 400,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                }
+              );
+            }
+            throw error;
+          }
 
           return new Response(
-            JSON.stringify({ ok: true, data }),
+            JSON.stringify({ ok: true }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         if (endpoint === 'originals') {
-          // POST /originals - Create original entry
-          const body = await req.json();
-          const validation = validateInput(originalSchema, body, corsHeaders);
-          if (!validation.valid) return validation.response;
-          const { brand_id, type_id, url } = validation.data;
-
-          const { count } = await supabase
-            .from('originals')
-            .select('*', { count: 'exact', head: true })
-            .eq('url', url);
-
-          if (count && count > 0) {
+          const { brandId, typeId, url } = await req.json();
+          
+          if (!brandId || !typeId || !url) {
             return new Response(
-              JSON.stringify({ ok: false, msg: '该URL已存在' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              JSON.stringify({ ok: false, msg: '品牌ID、类型ID和URL不能为空' }),
+              { 
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // 检查是否已存在相同URL
+          const { data: existing } = await supabase
+            .from('originals')
+            .select('id')
+            .eq('url', url)
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId)
+            .single();
+
+          if (existing) {
+            return new Response(
+              JSON.stringify({ ok: true, msg: '已存在，略过' }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
 
           const { data, error } = await supabase
             .from('originals')
-            .insert({ brand_id, type_id, url })
+            .insert({ brand_id: brandId, type_id: typeId, url })
             .select()
             .single();
 
           if (error) throw error;
 
           return new Response(
-            JSON.stringify({ ok: true, data }),
+            JSON.stringify({ ok: true, id: data.id }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         if (endpoint === 'generate' && pathParts.includes('replicas')) {
-          // POST /replicas/generate - Generate replicas
-          const body = await req.json();
-          const validation = validateInput(replicaGenerateSchema, body, corsHeaders);
-          if (!validation.valid) return validation.response;
-          const { brandId, typeId, count } = validation.data;
-
-          const { count: availableCount } = await supabase
-            .from('originals')
-            .select('*', { count: 'exact', head: true })
-            .eq('brand_id', brandId)
-            .eq('type_id', typeId)
-            .eq('scanned', false)
-            .is('replica_id', null);
-
-          if (!availableCount || availableCount < count) {
+          const { brandId, typeId, count } = await req.json();
+          
+          if (!brandId || !typeId || !count) {
             return new Response(
-              JSON.stringify({ 
-                ok: false, 
-                msg: `可用原始码不足，当前只有 ${availableCount || 0} 个，需要 ${count} 个` 
-              }),
+              JSON.stringify({ ok: false, msg: '品牌ID、类型ID和数量不能为空' }),
               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
 
+          const replicaCount = Math.min(Math.max(parseInt(count), 1), 1000);
+
+          // 检查原始码库存
+          const { count: originalCount } = await supabase
+            .from('originals')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId)
+            .eq('scanned', false);
+
+          if (!originalCount || originalCount === 0) {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '该品牌-类型暂无原始码库存，未生成副本' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // 创建批次
+          const { data: batch, error: batchError } = await supabase
+            .from('batches')
+            .insert({ brand_id: brandId, type_id: typeId, count: replicaCount })
+            .select()
+            .single();
+
+          if (batchError) throw batchError;
+
+          // 生成副本码
           const replicas = [];
-          for (let i = 0; i < count; i++) {
+          for (let i = 0; i < replicaCount; i++) {
             replicas.push({
               brand_id: brandId,
               type_id: typeId,
-              token: crypto.randomUUID(),
+              token: crypto.randomUUID().replace(/-/g, '').substring(0, 16),
+              batch_id: batch.id
             });
           }
 
-          const { data, error } = await supabase
+          const { error: replicasError } = await supabase
             .from('replicas')
-            .insert(replicas)
-            .select();
+            .insert(replicas);
 
-          if (error) throw error;
+          if (replicasError) throw replicasError;
 
           return new Response(
-            JSON.stringify({ ok: true, data }),
+            JSON.stringify({ ok: true, batchId: batch.id }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
+        // 原始码批量删除
+        if (endpoint === 'bulk-delete' && pathParts.includes('originals')) {
+          const { brandId, typeId } = await req.json();
+          
+          if (!brandId || !typeId || brandId === 'all' || typeId === 'all') {
+            return new Response(
+              JSON.stringify({ ok: false, msg: '请选择具体的品牌和类型进行删除' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // 先查询要删除的原始码数量
+          const { count: deleteCount } = await supabase
+            .from('originals')
+            .select('*', { count: 'exact', head: true })
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          // 删除原始码
+          await supabase
+            .from('originals')
+            .delete()
+            .eq('brand_id', brandId)
+            .eq('type_id', typeId);
+
+          return new Response(
+            JSON.stringify({ ok: true, deleted: deleteCount || 0 }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 副本批量删除 - 增强版，支持同时删除原始码
         if (endpoint === 'bulk-delete' && pathParts.includes('replicas')) {
           const { brandId, typeId, deleteOriginals } = await req.json();
           
@@ -703,6 +828,7 @@ Deno.serve(async (req) => {
             );
           }
 
+          // 先查询要删除的副本数量
           const { count: deleteCount } = await supabase
             .from('replicas')
             .select('*', { count: 'exact', head: true })
@@ -710,12 +836,14 @@ Deno.serve(async (req) => {
             .eq('type_id', typeId);
 
           if (deleteOriginals) {
+            // 如果需要同时删除原始码，先删除原始码
             await supabase
               .from('originals')
               .delete()
               .eq('brand_id', brandId)
               .eq('type_id', typeId);
           } else {
+            // 如果不删除原始码，清空原始码中的关联信息
             await supabase
               .from('originals')
               .update({ replica_id: null, scanned: false, scanned_at: null })
@@ -723,6 +851,7 @@ Deno.serve(async (req) => {
               .eq('type_id', typeId);
           }
 
+          // 删除副本
           await supabase
             .from('replicas')
             .delete()
@@ -735,6 +864,7 @@ Deno.serve(async (req) => {
           );
         }
 
+        // 原始码批量删除
         if (endpoint === 'bulk-delete' && pathParts.includes('originals')) {
           const { brandId, typeId } = await req.json();
           
@@ -745,12 +875,14 @@ Deno.serve(async (req) => {
             );
           }
 
+          // 先查询要删除的原始码数量
           const { count: deleteCount } = await supabase
             .from('originals')
             .select('*', { count: 'exact', head: true })
             .eq('brand_id', brandId)
             .eq('type_id', typeId);
 
+          // 删除原始码
           await supabase
             .from('originals')
             .delete()
@@ -776,6 +908,7 @@ Deno.serve(async (req) => {
             );
           }
 
+          // 创建导出任务，如果是'all'则传null
           const insertData: any = {
             base_url: baseUrl,
             status: 'pending'
