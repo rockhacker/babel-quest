@@ -1,9 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// 动态获取CORS headers
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin');
+  const allowedOrigins = [
+    'https://babel-quest.lovable.app',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ];
+  
+  // 检查是否是 lovableproject.com 子域名
+  const isLovableProject = origin && origin.includes('lovableproject.com');
+  const isAllowed = allowedOrigins.includes(origin || '') || isLovableProject;
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed && origin ? origin : 'https://babel-quest.lovable.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 // 获取环境变量中的管理员凭据
 const ADMIN_USER = Deno.env.get('ADMIN_USER') || 'admin';
@@ -18,6 +34,8 @@ interface SessionData {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,6 +48,8 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const path = url.pathname.split('/').pop();
+  
+  console.log('Auth request:', { method: req.method, url: req.url, pathname: url.pathname, path });
 
   try {
     switch (req.method) {
@@ -37,8 +57,12 @@ Deno.serve(async (req) => {
         if (path === 'login') {
           const { username, password } = await req.json();
           
+          console.log('Login attempt:', { username, hasPassword: !!password });
+          console.log('Expected user:', ADMIN_USER);
+          
           // 验证凭据
           if (username !== ADMIN_USER || password !== ADMIN_PASS) {
+            console.log('Login failed: invalid credentials');
             return new Response(
               JSON.stringify({ ok: false, msg: '用户名或密码错误' }),
               { 
@@ -72,14 +96,31 @@ Deno.serve(async (req) => {
             );
           }
 
-          // 设置cookie
+          // 同时支持cookie和Authorization头部
+          const origin = req.headers.get('origin');
+          const userAgent = req.headers.get('user-agent') || '';
+          const isSecure = origin?.startsWith('https://');
+          const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
+          
+          // 设置cookie（用于Chrome等浏览器）
+          let cookieValue;
+          if (isSecure && !isSafari) {
+            cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`;
+          } else {
+            cookieValue = `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax`;
+          }
+          
           const response = new Response(
-            JSON.stringify({ ok: true }),
+            JSON.stringify({ 
+              ok: true, 
+              sessionId: sessionId, // 为Safari提供sessionId，供前端存储到localStorage
+              user: { username }
+            }),
             { 
               headers: { 
                 ...corsHeaders, 
                 'Content-Type': 'application/json',
-                'Set-Cookie': `sid=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=None; Secure`
+                'Set-Cookie': cookieValue
               }
             }
           );

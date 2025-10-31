@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Package, Plus, Tags, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 
 interface Brand {
   id: string;
@@ -38,8 +39,8 @@ const Catalog: React.FC = () => {
   const fetchData = async () => {
     try {
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands', { credentials: 'include' }),
-        fetch('/api/types', { credentials: 'include' }),
+        apiRequest('/brands'),
+        apiRequest('/types'),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {
@@ -74,10 +75,8 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/brands', {
+      const response = await apiRequest('/brands', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ name: brandName.trim() }),
       });
 
@@ -122,10 +121,8 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/types', {
+      const response = await apiRequest('/types', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           name: typeName.trim() 
@@ -167,9 +164,8 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/brands/${brandId}`, {
+      const response = await apiRequest(`/brands/${brandId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       const data = await response.json();
@@ -205,9 +201,8 @@ const Catalog: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/types/${typeId}`, {
+      const response = await apiRequest(`/types/${typeId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       const data = await response.json();

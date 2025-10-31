@@ -14,10 +14,21 @@ import {
   Package, 
   AlertTriangle,
   CheckCircle,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserMultiFormatReader } from '@zxing/library';
+import { apiRequest } from '@/lib/api';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 interface Brand {
   id: string;
@@ -63,6 +74,11 @@ const Inventory: React.FC = () => {
   const [scannedFilter, setScannedFilter] = useState('all');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  
   // 表单状态
   const [formBrandId, setFormBrandId] = useState('');
   const [formTypeId, setFormTypeId] = useState('');
@@ -76,15 +92,21 @@ const Inventory: React.FC = () => {
 
   useEffect(() => {
     if (selectedBrandId || selectedTypeId || scannedFilter) {
-      fetchOriginals(true);
+      fetchOriginals(true, 1);
     }
   }, [selectedBrandId, selectedTypeId, scannedFilter]);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      fetchOriginals(false, page);
+    }
+  };
 
   const fetchInitialData = async () => {
     try {
       const [brandsRes, typesRes] = await Promise.all([
-        fetch('/api/brands'),
-        fetch('/api/types'),
+        apiRequest('/brands'),
+        apiRequest('/types'),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {
@@ -107,22 +129,27 @@ const Inventory: React.FC = () => {
     }
   };
 
-  const fetchOriginals = async (reset = false) => {
+  const fetchOriginals = async (reset = false, page = 1) => {
     try {
       const params = new URLSearchParams();
       if (selectedBrandId && selectedBrandId !== 'all') params.append('brandId', selectedBrandId);
       if (selectedTypeId && selectedTypeId !== 'all') params.append('typeId', selectedTypeId);
       if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
-      if (!reset && nextCursor) params.append('cursor', nextCursor);
+      params.append('page', page.toString());
+      params.append('limit', '20');
       
-      const response = await fetch(`/api/originals?${params}`);
+      const response = await apiRequest(`/originals?${params}`);
       if (response.ok) {
         const data = await response.json();
         if (reset) {
           setOriginals(data.items);
+          setCurrentPage(1);
         } else {
-          setOriginals(prev => [...prev, ...data.items]);
+          setOriginals(data.items);
+          setCurrentPage(page);
         }
+        setTotalPages(data.totalPages || 1);
+        setHasMore(data.hasMore || false);
         setNextCursor(data.nextCursor);
       }
     } catch (error) {
@@ -144,9 +171,8 @@ const Inventory: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/originals', {
+      const response = await apiRequest('/originals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: formBrandId, 
           typeId: formTypeId, 
@@ -162,7 +188,7 @@ const Inventory: React.FC = () => {
           description: data.msg || "原始码已入库",
         });
         setQrUrl('');
-        fetchOriginals(true);
+        fetchOriginals(true, 1);
       } else {
         toast({
           title: "入库失败",
@@ -197,9 +223,8 @@ const Inventory: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/originals/bulk-delete', {
+      const response = await apiRequest('/originals/bulk-delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           typeId: selectedTypeId 
@@ -213,7 +238,7 @@ const Inventory: React.FC = () => {
           title: "删除成功",
           description: `已删除 ${data.deleted} 条原始码`,
         });
-        fetchOriginals(true);
+        fetchOriginals(true, 1);
       } else {
         toast({
           title: "删除失败",
@@ -359,12 +384,8 @@ const Inventory: React.FC = () => {
     console.log('Auto-submitting to inventory...', qrContent);
     
     try {
-      const response = await fetch('/api/originals', {
+      const response = await apiRequest('/originals', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
         body: JSON.stringify({ 
           brandId: formBrandId, 
           typeId: formTypeId, 
@@ -382,7 +403,7 @@ const Inventory: React.FC = () => {
       });
       
       if (data.ok) {
-        fetchOriginals(true);
+        fetchOriginals(true, 1);
       }
     } catch (error) {
       console.error('Auto submit error:', error);
@@ -661,15 +682,44 @@ const Inventory: React.FC = () => {
                 </table>
               </div>
               
-              {nextCursor && (
-                <div className="text-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => fetchOriginals(false)}
-                    disabled={submitting}
-                  >
-                    加载更多
-                  </Button>
+              {/* 分页控件 */}
+              {totalPages > 1 && (
+                <div className="flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          className={currentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      
+                      {/* 显示页码 */}
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                        if (page > totalPages) return null;
+                        
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
               )}
             </div>
