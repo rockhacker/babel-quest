@@ -1,24 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// 动态获取CORS headers
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get('origin');
-  const allowedOrigins = [
-    'https://babel-quest.lovable.app',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173'
-  ];
-  
-  // 检查是否是 lovableproject.com 子域名
-  const isLovableProject = origin && origin.includes('lovableproject.com');
-  const isAllowed = allowedOrigins.includes(origin || '') || isLovableProject;
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowed && origin ? origin : 'https://babel-quest.lovable.app',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Credentials': 'true',
-  };
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 // 导出任务处理函数
 async function processExportJob(jobId: string, brandId: string | null, typeId: string | null, supabase: any) {
@@ -166,19 +151,10 @@ async function verifySession(req: Request) {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  // 先尝试从cookie获取sessionId
   const cookies = req.headers.get('cookie');
-  let sessionId = cookies?.split(';')
+  const sessionId = cookies?.split(';')
     .find(c => c.trim().startsWith('sid='))
     ?.split('=')[1];
-
-  // 如果cookie中没有，尝试从Authorization头部获取（用于Safari等浏览器）
-  if (!sessionId) {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      sessionId = authHeader.substring(7);
-    }
-  }
 
   if (!sessionId) {
     return null;
@@ -195,8 +171,6 @@ async function verifySession(req: Request) {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -209,16 +183,6 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(p => p);
   const endpoint = pathParts[pathParts.length - 1];
-  
-  // 对于DELETE请求，如果路径是 /api/brands/{id} 或 /api/types/{id}
-  // 需要正确识别endpoint为'brands'或'types'而不是ID
-  let actualEndpoint = endpoint;
-  if (req.method === 'DELETE' && pathParts.length >= 2) {
-    const secondLast = pathParts[pathParts.length - 2];
-    if (secondLast === 'brands' || secondLast === 'types') {
-      actualEndpoint = secondLast;
-    }
-  }
 
   try {
     // 验证session
@@ -298,7 +262,6 @@ Deno.serve(async (req) => {
           const typeId = url.searchParams.get('typeId');
           const scanned = url.searchParams.get('scanned');
           const cursor = url.searchParams.get('cursor');
-          const page = parseInt(url.searchParams.get('page') || '1');
           const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
 
           let query = supabase.from('originals').select(`
@@ -307,36 +270,15 @@ Deno.serve(async (req) => {
             types (name)
           `);
 
-          if (brandId && brandId !== 'all') query = query.eq('brand_id', brandId);
-          if (typeId && typeId !== 'all') query = query.eq('type_id', typeId);
+          if (brandId) query = query.eq('brand_id', brandId);
+          if (typeId) query = query.eq('type_id', typeId);
           if (scanned === '0') query = query.eq('scanned', false);
           if (scanned === '1') query = query.eq('scanned', true);
-
-          // 支持两种分页方式：cursor分页（原有方式）和页码分页（新增）
-          if (cursor) {
-            query = query.lt('id', cursor);
-          } else if (page > 1) {
-            const offset = (page - 1) * limit;
-            query = query.range(offset, offset + limit - 1);
-          } else {
-            query = query.limit(limit);
-          }
-
-          // 获取总数用于页码分页
-          let totalCount = 0;
-          if (!cursor && page) {
-            let countQuery = supabase.from('originals').select('*', { count: 'exact', head: true });
-            if (brandId && brandId !== 'all') countQuery = countQuery.eq('brand_id', brandId);
-            if (typeId && typeId !== 'all') countQuery = countQuery.eq('type_id', typeId);
-            if (scanned === '0') countQuery = countQuery.eq('scanned', false);
-            if (scanned === '1') countQuery = countQuery.eq('scanned', true);
-            
-            const { count } = await countQuery;
-            totalCount = count || 0;
-          }
+          if (cursor) query = query.lt('id', cursor);
 
           const { data, error } = await query
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(limit);
 
           if (error) throw error;
 
@@ -345,19 +287,10 @@ Deno.serve(async (req) => {
             rid: item.id.substring(0, 8)
           }));
 
-          const nextCursor = cursor && items.length === limit ? items[items.length - 1].id : null;
-          const totalPages = Math.ceil(totalCount / limit);
-          const hasMore = page < totalPages;
+          const nextCursor = items.length === limit ? items[items.length - 1].id : null;
 
           return new Response(
-            JSON.stringify({ 
-              items, 
-              nextCursor,
-              totalPages,
-              currentPage: page,
-              hasMore,
-              total: totalCount
-            }),
+            JSON.stringify({ items, nextCursor }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -389,7 +322,6 @@ Deno.serve(async (req) => {
           const batchId = url.searchParams.get('batchId');
           const scanned = url.searchParams.get('scanned');
           const cursor = url.searchParams.get('cursor');
-          const page = parseInt(url.searchParams.get('page') || '1');
           const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
 
           // 从请求头获取前端域名
@@ -406,33 +338,11 @@ Deno.serve(async (req) => {
           if (batchId) query = query.eq('batch_id', batchId);
           if (scanned === '0') query = query.eq('scanned', false);
           if (scanned === '1') query = query.eq('scanned', true);
-
-          // 支持两种分页方式：cursor分页（原有方式）和页码分页（新增）
-          if (cursor) {
-            query = query.lt('id', cursor);
-          } else if (page > 1) {
-            const offset = (page - 1) * limit;
-            query = query.range(offset, offset + limit - 1);
-          } else {
-            query = query.limit(limit);
-          }
-
-          // 获取总数用于页码分页
-          let totalCount = 0;
-          if (!cursor && page) {
-            let countQuery = supabase.from('replicas').select('*', { count: 'exact', head: true });
-            if (brandId && brandId !== 'all') countQuery = countQuery.eq('brand_id', brandId);
-            if (typeId && typeId !== 'all') countQuery = countQuery.eq('type_id', typeId);
-            if (batchId) countQuery = countQuery.eq('batch_id', batchId);
-            if (scanned === '0') countQuery = countQuery.eq('scanned', false);
-            if (scanned === '1') countQuery = countQuery.eq('scanned', true);
-            
-            const { count } = await countQuery;
-            totalCount = count || 0;
-          }
+          if (cursor) query = query.lt('id', cursor);
 
           const { data, error } = await query
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(limit);
 
           if (error) throw error;
 
@@ -442,19 +352,10 @@ Deno.serve(async (req) => {
             url: `https://isfxgcfocfctwixklbvw.supabase.co/functions/v1/redirect/r/${item.token}`
           }));
 
-          const nextCursor = cursor && items.length === limit ? items[items.length - 1].id : null;
-          const totalPages = Math.ceil(totalCount / limit);
-          const hasMore = page < totalPages;
+          const nextCursor = items.length === limit ? items[items.length - 1].id : null;
 
           return new Response(
-            JSON.stringify({ 
-              items, 
-              nextCursor,
-              totalPages,
-              currentPage: page,
-              hasMore,
-              total: totalCount
-            }),
+            JSON.stringify({ items, nextCursor }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -501,7 +402,7 @@ Deno.serve(async (req) => {
         break;
 
       case 'DELETE':
-        if (actualEndpoint === 'brands') {
+        if (endpoint === 'brands') {
           const brandId = pathParts[pathParts.length - 1];
           
           if (!brandId) {
@@ -553,7 +454,7 @@ Deno.serve(async (req) => {
           );
         }
 
-        if (actualEndpoint === 'types') {
+        if (endpoint === 'types') {
           const typeId = pathParts[pathParts.length - 1];
           
           if (!typeId) {

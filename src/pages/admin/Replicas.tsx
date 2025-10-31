@@ -17,22 +17,10 @@ import {
   Clock,
   AlertTriangle,
   Loader2,
-  RefreshCw,
-  QrCode,
-  Eye
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { apiRequest } from '@/lib/api';
-import QRCodeModal from '@/components/QRCodeModal';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
 
 interface Brand {
   id: string;
@@ -85,22 +73,6 @@ const Replicas: React.FC = () => {
   const [scannedFilter, setScannedFilter] = useState('all');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
-  // 分页状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  
-  // 二维码模态框状态
-  const [qrCodeModal, setQrCodeModal] = useState<{
-    isOpen: boolean;
-    url: string;
-    token: string;
-  }>({
-    isOpen: false,
-    url: '',
-    token: '',
-  });
-  
   // 生成表单
   const [genBrandId, setGenBrandId] = useState('');
   const [genTypeId, setGenTypeId] = useState('');
@@ -121,15 +93,9 @@ const Replicas: React.FC = () => {
 
   useEffect(() => {
     if (selectedBrandId || selectedTypeId || scannedFilter) {
-      fetchReplicas(true, 1);
+      fetchReplicas(true);
     }
   }, [selectedBrandId, selectedTypeId, scannedFilter]);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      fetchReplicas(false, page);
-    }
-  };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -155,7 +121,7 @@ const Replicas: React.FC = () => {
         (payload) => {
           console.log('副本状态变化:', payload);
           // 当副本状态发生变化时，自动刷新数据
-          fetchReplicas(true, 1);
+          fetchReplicas(true);
         }
       )
       .subscribe();
@@ -168,8 +134,8 @@ const Replicas: React.FC = () => {
   const fetchInitialData = async () => {
     try {
       const [brandsRes, typesRes] = await Promise.all([
-        apiRequest('/brands'),
-        apiRequest('/types'),
+        fetch('/api/brands'),
+        fetch('/api/types'),
       ]);
 
       if (brandsRes.ok && typesRes.ok) {
@@ -179,7 +145,7 @@ const Replicas: React.FC = () => {
         setTypes(typesData);
       }
       
-      await fetchReplicas(true, 1);
+      await fetchReplicas(true);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast({
@@ -192,16 +158,15 @@ const Replicas: React.FC = () => {
     }
   };
 
-  const fetchReplicas = async (reset = false, page = 1) => {
+  const fetchReplicas = async (reset = false) => {
     try {
       const params = new URLSearchParams();
       if (selectedBrandId && selectedBrandId !== 'all') params.append('brandId', selectedBrandId);
       if (selectedTypeId && selectedTypeId !== 'all') params.append('typeId', selectedTypeId);
       if (scannedFilter && scannedFilter !== 'all') params.append('scanned', scannedFilter);
-      params.append('page', page.toString());
-      params.append('limit', '20');
+      if (!reset && nextCursor) params.append('cursor', nextCursor);
       
-      const response = await apiRequest(`/replicas?${params}`);
+      const response = await fetch(`/api/replicas?${params}`);
       if (response.ok) {
         const data = await response.json();
         // 对副本进行排序：已扫描的在前面，按扫描时间倒序；未扫描的在后面，按创建时间倒序
@@ -222,13 +187,22 @@ const Replicas: React.FC = () => {
         
         if (reset) {
           setReplicas(sortedItems);
-          setCurrentPage(1);
         } else {
-          setReplicas(sortedItems);
-          setCurrentPage(page);
+          setReplicas(prev => {
+            const combined = [...prev, ...sortedItems];
+            // 对合并后的数据重新排序
+            return combined.sort((a: Replica, b: Replica) => {
+              if (a.scanned === b.scanned) {
+                if (a.scanned) {
+                  return new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime();
+                } else {
+                  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+                }
+              }
+              return a.scanned ? -1 : 1;
+            });
+          });
         }
-        setTotalPages(data.totalPages || 1);
-        setHasMore(data.hasMore || false);
         setNextCursor(data.nextCursor);
       }
     } catch (error) {
@@ -260,8 +234,9 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await apiRequest('/replicas/generate', {
+      const response = await fetch('/api/replicas/generate', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: genBrandId, 
           typeId: genTypeId, 
@@ -277,7 +252,7 @@ const Replicas: React.FC = () => {
           description: `已生成 ${count} 个副本码`,
         });
         setGenCount('100');
-        fetchReplicas(true, 1);
+        fetchReplicas(true);
       } else {
         toast({
           title: "生成失败",
@@ -308,8 +283,9 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await apiRequest('/replica_export_jobs', {
+      const response = await fetch('/api/replica_export_jobs', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           typeId: selectedTypeId,
@@ -354,7 +330,7 @@ const Replicas: React.FC = () => {
     if (!exportJob) return;
 
     try {
-      const response = await apiRequest(`/replica_export_jobs/${exportJob.id}`);
+      const response = await fetch(`/api/replica_export_jobs/${exportJob.id}`);
       if (response.ok) {
         const data = await response.json();
         if (data.ok) {
@@ -413,8 +389,9 @@ const Replicas: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const response = await apiRequest('/replicas/bulk-delete', {
+      const response = await fetch('/api/replicas/bulk-delete', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           brandId: selectedBrandId, 
           typeId: selectedTypeId,
@@ -429,7 +406,7 @@ const Replicas: React.FC = () => {
           title: "删除成功",
           description: `已删除 ${data.deleted} 条副本码`,
         });
-        fetchReplicas(true, 1);
+        fetchReplicas(true);
       } else {
         toast({
           title: "删除失败",
@@ -456,22 +433,6 @@ const Replicas: React.FC = () => {
   const getGenFilteredTypes = () => {
     if (!genBrandId) return types;
     return types.filter(type => type.brand_id === genBrandId);
-  };
-
-  const showQRCode = (replica: Replica) => {
-    setQrCodeModal({
-      isOpen: true,
-      url: replica.url,
-      token: replica.token,
-    });
-  };
-
-  const closeQRCode = () => {
-    setQrCodeModal({
-      isOpen: false,
-      url: '',
-      token: '',
-    });
   };
 
   if (loading) {
@@ -713,7 +674,7 @@ const Replicas: React.FC = () => {
             <div className="flex space-x-2">
               <Button
                 variant="outline"
-                onClick={() => fetchReplicas(true, 1)}
+                onClick={() => fetchReplicas(true)}
                 disabled={submitting}
                 className="flex-1"
               >
@@ -749,19 +710,18 @@ const Replicas: React.FC = () => {
           ) : (
             <div className="space-y-4">
               <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-2 px-4">Token</th>
-                        <th className="text-left py-2 px-4">访问URL</th>
-                        <th className="text-left py-2 px-4">品牌</th>
-                        <th className="text-left py-2 px-4">类型</th>
-                        <th className="text-left py-2 px-4">批次</th>
-                        <th className="text-left py-2 px-4">状态</th>
-                        <th className="text-left py-2 px-4">扫描时间</th>
-                        <th className="text-left py-2 px-4">操作</th>
-                      </tr>
-                    </thead>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-4">Token</th>
+                      <th className="text-left py-2 px-4">访问URL</th>
+                      <th className="text-left py-2 px-4">品牌</th>
+                      <th className="text-left py-2 px-4">类型</th>
+                      <th className="text-left py-2 px-4">批次</th>
+                      <th className="text-left py-2 px-4">状态</th>
+                      <th className="text-left py-2 px-4">扫描时间</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {replicas.map((replica) => (
                       <tr key={replica.id} className="border-b border-border hover:bg-muted/50">
@@ -808,75 +768,27 @@ const Replicas: React.FC = () => {
                             : '-'
                           }
                         </td>
-                        <td className="py-3 px-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => showQRCode(replica)}
-                            title="查看二维码"
-                          >
-                            <QrCode className="h-3 w-3 mr-1" />
-                            二维码
-                          </Button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               
-              {/* 分页控件 */}
-              {totalPages > 1 && (
-                <div className="flex justify-center">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          className={currentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                        />
-                      </PaginationItem>
-                      
-                      {/* 显示页码 */}
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                        if (page > totalPages) return null;
-                        
-                        return (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
-                      
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+              {nextCursor && (
+                <div className="text-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchReplicas(false)}
+                    disabled={submitting}
+                  >
+                    加载更多
+                  </Button>
                 </div>
               )}
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* 二维码显示模态框 */}
-      <QRCodeModal
-        isOpen={qrCodeModal.isOpen}
-        onClose={closeQRCode}
-        url={qrCodeModal.url}
-        token={qrCodeModal.token}
-      />
     </div>
   );
 };
